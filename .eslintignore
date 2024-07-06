@@ -1,0 +1,10 @@
+/node_modules
+.eslintrc
+package-lock.json
+package.json
+.gitignore
+tsconfig.json
+/.vscode
+settings.json
+README.md
+INFO.md
