@@ -1,4 +1,6 @@
 /node_modules
+/cert
+/dist
 .eslintrc
 package-lock.json
 package.json
