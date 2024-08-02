@@ -15,10 +15,8 @@ const UserSchema = new Schema<UserInterface>(
 		},
 		join_date: { type: Date, required: true },
 		pfp: { type: String },
-		profile: {
-			header_image: { type: String },
-			text: { type: String },
-		},
+		profile_header: { type: String },
+		profile_text: { type: String },
 		following: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 		followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 		posts: [{ type: Schema.Types.ObjectId, ref: 'Post' }],

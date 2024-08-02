@@ -12,10 +12,8 @@ export interface UserInterface {
 	nickname: string;
 	join_date: Date;
 	pfp?: string;
-	profile: {
-		header_image?: string;
-		text?: string;
-	};
+	profile_header?: string;
+	profile_text?: string;
 	following: Types.ObjectId[];
 	followers: Types.ObjectId[];
 	posts: Types.ObjectId[];
