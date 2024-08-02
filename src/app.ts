@@ -13,7 +13,7 @@ import Debug from 'debug';
 import cors from 'cors';
 const debug = Debug('server');
 
-const apiRouter = require('./routes/api');
+import apiRouter from './routes/api';
 
 const app = express();
 
@@ -60,13 +60,13 @@ app.use(passport.session());
 
 app.use((req: req, res: res, next: next): res | next | void => {
 	console.log('user is authenticated:', req.isAuthenticated());
-	console.log('user =>', req.user);
 
 	if (req.url === '/login') return next();
 	if (!req.isAuthenticated()) {
-		console.log('user not authenticated');
 		return res.sendStatus(401);
 	}
+	console.log('user =>', req.user);
+	res.locals.user = req.user;
 
 	next();
 });
