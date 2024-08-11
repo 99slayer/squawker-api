@@ -19,6 +19,9 @@ const LikeSchema = new Schema<LikeInterface>(
 			enum: ['Post', 'Comment'],
 			required: true
 		}
+	},
+	{
+		id: false
 	}
 );
 
