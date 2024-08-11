@@ -14,28 +14,28 @@ router.post('/login', authController.login);
 router.delete('/logout', authController.logout);
 
 // USER ROUTES
-router.get('/:username', userController.getUser);
+router.get('/user/:username', userController.getUser);
 router.post('/signup', userController.createUser);
-router.put('/:username/:update', userController.updateUser);
+router.put('/:username/update-:update', userController.updateUser);
 
 // POST ROUTES
 router.get('/home', postController.home);
 router.get('/:username/posts', postController.getUserPosts);
-router.get('/:username/:postId', postController.getPost);
-router.post('/:username/:postId', postController.createPost);
-router.put('/:username/:postId', postController.updatePost);
-router.delete('/:username/:postId', postController.deletePost);
+router.get('/:username/status/:postId', postController.getPost);
+router.post('/publish-post', postController.createPost);
+router.put('/edit-post/:postId', postController.updatePost);
+router.delete('/delete-post/:postId', postController.deletePost);
 
 // COMMENT ROUTES
 router.get('/:username/comments', commentController.getUserComments);
-router.get('/:username/:commentId', commentController.getComment);
-router.post('/:username/:commentId', commentController.createComment);
-router.put('/:username/:commentId', commentController.updateComment);
-router.delete('/:username/:commentId', commentController.deleteComment);
+router.get('/:username/status/:commentId', commentController.getComment);
+router.post('/:username/publish-comment', commentController.createComment);
+router.put('/:username/edit-:commentId', commentController.updateComment);
+router.delete('/:username/delete-:commentId', commentController.deleteComment);
 
 // LIKE ROUTES
 router.get('/:username/likes', likeController.getUserLikes);
-router.post('/:username/:likeId', likeController.createLike);
-router.delete('/:username/:likeId', likeController.deleteLike);
+router.post('/:username/like', likeController.createLike);
+router.delete('/:username/delete-:likeId', likeController.deleteLike);
 
 export default router;
