@@ -1,9 +1,12 @@
 import asyncHandler from 'express-async-handler';
-import { body, validationResult } from 'express-validator';
+import { body, validationResult, ValidationChain } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import { req, res, next, UserInterface } from '../types';
 import User from '../models/user';
-import { Document, HydratedDocument } from 'mongoose';
+import Post from '../models/post';
+import Comment from '../models/comment';
+import { Document, HydratedDocument, PopulatedDoc } from 'mongoose';
+import { RequestHandler } from 'express';
 
 const innerWhitespace = (string: string) => {
 	if (/\s/.test(string)) {
@@ -13,8 +16,12 @@ const innerWhitespace = (string: string) => {
 	return true;
 };
 
-export const getUser = asyncHandler(async (req: req, res: res, next: next): Promise<void> => {
-	const user: Document<UserInterface> | null = await User.findOne({ username: req.params.username });
+export const getUser: RequestHandler = asyncHandler(async (req: req, res: res, next: next): Promise<void> => {
+	const user: PopulatedDoc<UserInterface> | null = await User
+		.findOne({ username: req.params.username })
+		.populate('post_count')
+		.populate('comment_count')
+		.populate('like_count');
 
 	if (!user) {
 		res.sendStatus(404);
@@ -24,7 +31,7 @@ export const getUser = asyncHandler(async (req: req, res: res, next: next): Prom
 	res.send({ user }).status(200);
 });
 
-export const createUser = [
+export const createUser: (RequestHandler | ValidationChain)[] = [
 	body('username')
 		.trim()
 		.custom(innerWhitespace)
@@ -97,7 +104,16 @@ export const createUser = [
 	}),
 ];
 
-export const updateUser = [
+export const updateUser: (RequestHandler | ValidationChain)[] = [
+	asyncHandler(async (req, res, next) => {
+		if (res.locals.user.username !== req.params.username) {
+			res.sendStatus(401);
+			return;
+		}
+
+		next();
+	}),
+
 	body('username')
 		.if((value, { req }) => {
 			return req.body.username;
@@ -215,6 +231,22 @@ export const updateUser = [
 			});
 
 			return;
+		}
+
+		// Updates the users posts/comments.
+		if (
+			req.params.update === 'username' ||
+			req.params.update === 'nickname' ||
+			req.params.update === 'pfp'
+		) {
+			await Post.updateMany(
+				{ 'user.id': res.locals.user._id },
+				{ [`user.${req.params.update}`]: req.body[req.params.update] }
+			);
+			await Comment.updateMany(
+				{ 'user.id': res.locals.user._id },
+				{ [`user.${req.params.update}`]: req.body[req.params.update] }
+			);
 		}
 
 		res.sendStatus(200);
