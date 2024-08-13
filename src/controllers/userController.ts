@@ -16,20 +16,21 @@ const innerWhitespace = (string: string) => {
 	return true;
 };
 
-export const getUser: RequestHandler = asyncHandler(async (req: req, res: res, next: next): Promise<void> => {
-	const user: PopulatedDoc<UserInterface> | null = await User
-		.findOne({ username: req.params.username })
-		.populate('post_count')
-		.populate('comment_count')
-		.populate('like_count');
+export const getUser: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		const user: PopulatedDoc<UserInterface> | null = await User
+			.findOne({ username: req.params.username })
+			.populate('post_count')
+			.populate('comment_count')
+			.populate('like_count');
 
-	if (!user) {
-		res.sendStatus(404);
-		return;
-	}
+		if (!user) {
+			res.sendStatus(404);
+			return;
+		}
 
-	res.send({ user }).status(200);
-});
+		res.send({ user }).status(200);
+	});
 
 export const createUser: (RequestHandler | ValidationChain)[] = [
 	body('username')
@@ -80,39 +81,41 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 			return true;
 		}),
 
-	asyncHandler(async (req: req, res: res, next: next) => {
-		const errors = validationResult(req);
+	asyncHandler(
+		async (req: req, res: res, next: next) => {
+			const errors = validationResult(req);
 
-		if (!errors.isEmpty()) {
-			res.sendStatus(400);
-			return;
-		}
+			if (!errors.isEmpty()) {
+				res.sendStatus(400);
+				return;
+			}
 
-		bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
-			if (err) throw err;
+			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
+				if (err) throw err;
 
-			const user: HydratedDocument<UserInterface> = new User({
-				username: req.body.username,
-				password: hashedPswd,
-				email: req.body.email,
-				join_date: new Date,
+				const user: HydratedDocument<UserInterface> = new User({
+					username: req.body.username,
+					password: hashedPswd,
+					email: req.body.email,
+					join_date: new Date,
+				});
+
+				await user.save();
+				res.sendStatus(200);
 			});
-
-			await user.save();
-			res.sendStatus(200);
-		});
-	}),
+		}),
 ];
 
 export const updateUser: (RequestHandler | ValidationChain)[] = [
-	asyncHandler(async (req, res, next) => {
-		if (res.locals.user.username !== req.params.username) {
-			res.sendStatus(401);
-			return;
-		}
+	asyncHandler(
+		async (req, res, next) => {
+			if (res.locals.user.username !== req.params.username) {
+				res.sendStatus(401);
+				return;
+			}
 
-		next();
-	}),
+			next();
+		}),
 
 	body('username')
 		.if((value, { req }) => {
@@ -202,53 +205,54 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 		.isLength({ max: 100 })
 		.withMessage('Profile header url exceeds character limit.'),
 
-	asyncHandler(async (req: req, res: res, next: next): Promise<void> => {
-		const errors = validationResult(req);
+	asyncHandler(
+		async (req: req, res: res, next: next): Promise<void> => {
+			const errors = validationResult(req);
 
-		if (!errors.isEmpty()) {
-			res.sendStatus(400);
-			return;
-		}
+			if (!errors.isEmpty()) {
+				res.sendStatus(400);
+				return;
+			}
 
-		if (!req.body.password) {
-			await User.findOneAndUpdate(
-				{ _id: res.locals.user._id },
-				{ [`${req.params.update}`]: req.body[req.params.update] },
-				{ new: true },
-			);
-		} else {
-			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
-				if (err) throw err;
-
+			if (!req.body.password) {
 				await User.findOneAndUpdate(
 					{ _id: res.locals.user._id },
-					{ password: hashedPswd },
+					{ [`${req.params.update}`]: req.body[req.params.update] },
 					{ new: true },
 				);
+			} else {
+				bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
+					if (err) throw err;
 
-				res.sendStatus(200);
+					await User.findOneAndUpdate(
+						{ _id: res.locals.user._id },
+						{ password: hashedPswd },
+						{ new: true },
+					);
+
+					res.sendStatus(200);
+					return;
+				});
+
 				return;
-			});
+			}
 
-			return;
-		}
+			// Updates the users posts/comments.
+			if (
+				req.params.update === 'username' ||
+				req.params.update === 'nickname' ||
+				req.params.update === 'pfp'
+			) {
+				await Post.updateMany(
+					{ 'user.id': res.locals.user._id },
+					{ [`user.${req.params.update}`]: req.body[req.params.update] }
+				);
+				await Comment.updateMany(
+					{ 'user.id': res.locals.user._id },
+					{ [`user.${req.params.update}`]: req.body[req.params.update] }
+				);
+			}
 
-		// Updates the users posts/comments.
-		if (
-			req.params.update === 'username' ||
-			req.params.update === 'nickname' ||
-			req.params.update === 'pfp'
-		) {
-			await Post.updateMany(
-				{ 'user.id': res.locals.user._id },
-				{ [`user.${req.params.update}`]: req.body[req.params.update] }
-			);
-			await Comment.updateMany(
-				{ 'user.id': res.locals.user._id },
-				{ [`user.${req.params.update}`]: req.body[req.params.update] }
-			);
-		}
-
-		res.sendStatus(200);
-	}),
+			res.sendStatus(200);
+		}),
 ];
