@@ -23,7 +23,7 @@ export interface UserInterface {
 	likes?: PopulatedDoc<LikeInterface>[];
 }
 
-export interface PostInterface {
+export interface BaseInterface {
 	text: string;
 	timestamp: Date;
 	user: {
@@ -32,38 +32,32 @@ export interface PostInterface {
 		nickname: string;
 		pfp?: string;
 	};
-	quoted_post?: {
-		post_id: Types.ObjectId;
-		doc_model: string
-	}
 	post_image?: string;
 	comments?: PopulatedDoc<CommentInterface>[];
 	reposts?: PopulatedDoc<PostInterface>[];
 	likes?: PopulatedDoc<LikeInterface>[];
 }
 
-export interface CommentInterface {
-	text: string;
-	timestamp: Date;
-	user: {
-		id: Types.ObjectId;
-		username: string;
-		nickname: string;
-		pfp: string;
-	};
+export interface PostInterface extends BaseInterface {
+	post_type: 'Post';
+	quoted_post?: {
+		post_id: Types.ObjectId;
+		doc_model: 'Post' | 'Comment';
+	}
+}
+
+export interface CommentInterface extends BaseInterface {
+	post_type: 'Comment';
 	root_post: Types.ObjectId;
 	parent_post: {
 		post_id: Types.ObjectId;
-		doc_model: string;
+		doc_model: 'Post' | 'Comment';
 	};
-	post_image?: string;
-	comments?: PopulatedDoc<CommentInterface>[];
-	reposts?: PopulatedDoc<PostInterface>[];
-	likes?: PopulatedDoc<LikeInterface>[];
 }
 
 export interface LikeInterface {
+	timestamp: Date,
 	user: Types.ObjectId;
 	post: Types.ObjectId;
-	doc_model: string;
+	doc_model: 'Post' | 'Comment';
 }
