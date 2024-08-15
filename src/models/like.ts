@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 
 const LikeSchema = new Schema<LikeInterface>(
 	{
+		timestamp: { type: Date, required: true },
 		user: {
 			type: Schema.Types.ObjectId,
 			ref: 'User',
@@ -18,7 +19,7 @@ const LikeSchema = new Schema<LikeInterface>(
 			type: String,
 			enum: ['Post', 'Comment'],
 			required: true
-		}
+		},
 	},
 	{
 		id: false
