@@ -1,5 +1,5 @@
-export * as authController from './authController';
-export * as userController from './userController';
-export * as postController from './postController';
-export * as commentController from './commentController';
-export * as likeController from './likeController';
+export * as auth from './authController';
+export * as user from './userController';
+export * as post from './postController';
+export * as comment from './commentController';
+export * as like from './likeController';
