@@ -13,8 +13,10 @@ import {
 	next,
 	doc,
 	UserInterface,
-	PostInterface
+	PostInterface,
+	BaseInterface
 } from '../types';
+import Base from '../models/base';
 import Post from '../models/post';
 import User from '../models/user';
 import { PopulatedDoc, HydratedDocument, Types } from 'mongoose';
@@ -25,10 +27,7 @@ export const home: RequestHandler = asyncHandler(
 		const postCount: number = Number(req.query.postCount);
 		const batchSize: number = 10;
 
-		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) {
-			res.sendStatus(400);
-			return;
-		}
+		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('400');
 
 		const userPosts: doc<UserInterface> = await User
 			.findById(res.locals.user._id)
@@ -36,7 +35,7 @@ export const home: RequestHandler = asyncHandler(
 			.populate({
 				path: 'posts',
 				select: 'timestamp user.id'
-			});
+			}).orFail(new Error('404'));
 
 		const user: doc<UserInterface> = await User
 			.findById(res.locals.user._id)
@@ -48,12 +47,7 @@ export const home: RequestHandler = asyncHandler(
 					path: 'posts',
 					select: 'timestamp user.id'
 				}
-			});
-
-		if (!userPosts || !user) {
-			res.sendStatus(400);
-			return;
-		}
+			}).orFail(new Error('404'));
 
 		const posts = [...(userPosts?.posts ?? [])];
 		for (let i: number = 0; i < user.following.length; i++) {
@@ -68,7 +62,7 @@ export const home: RequestHandler = asyncHandler(
 			b: PopulatedDoc<PostInterface>
 		) => {
 			if (a instanceof Types.ObjectId || b instanceof Types.ObjectId) {
-				throw new Error('unpopulated id');
+				throw new Error('Problems populating posts.');
 			} else {
 				return a!.timestamp.getTime() - b!.timestamp.getTime();
 			}
@@ -87,10 +81,7 @@ export const getUserPosts: RequestHandler = asyncHandler(
 		const postCount: number = Number(req.query.postCount);
 		const batchSize: number = 10;
 
-		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) {
-			res.sendStatus(400);
-			return;
-		}
+		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('400');
 
 		const user: doc<UserInterface> = await User
 			.findOne({ username: req.params.username })
@@ -99,12 +90,7 @@ export const getUserPosts: RequestHandler = asyncHandler(
 			.populate({
 				path: 'posts',
 				populate: 'comment_count repost_count like_count'
-			});
-
-		if (!user) {
-			res.sendStatus(404);
-			return;
-		}
+			}).orFail(new Error('404'));
 
 		const posts: PopulatedDoc<PostInterface>[] = user.posts ?? [];
 		const postBatch: PopulatedDoc<PostInterface>[] = posts.slice(
@@ -117,12 +103,8 @@ export const getUserPosts: RequestHandler = asyncHandler(
 export const getPost: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
 		const post: doc<PostInterface> = await Post
-			.findById(req.params.postId);
-
-		if (!post) {
-			res.sendStatus(404);
-			return;
-		}
+			.findById(req.params.postId)
+			.orFail(new Error('404'));
 
 		res.send({ post }).status(200);
 	});
@@ -138,15 +120,7 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors: Result<ValidationError> = validationResult(req);
 
-			if (!errors.isEmpty()) {
-				res.sendStatus(400);
-				return;
-			}
-
-			const quotedPost: doc<PostInterface> = await Post
-				.findById(req.body.quotedPost)
-				.select('-comment_slice')
-				.exec();
+			if (!errors.isEmpty()) throw new Error('400');
 
 			const post: HydratedDocument<PostInterface> = new Post({
 				text: req.body.text,
@@ -159,10 +133,18 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 				}
 			});
 
-			if (quotedPost) post.quoted_post = {
-				post_id: quotedPost._id,
-				doc_model: 'root_post' in quotedPost ? 'Comment' : 'Post'
-			};
+			if (req.params.quotedPostId) {
+				const quotedPost: doc<BaseInterface> | null = await Base
+					.findById(req.params.quotedPostId)
+					.select('-comment_slice')
+					.orFail(new Error('404'));
+
+				post.quoted_post = {
+					post_id: quotedPost._id,
+					doc_model: quotedPost.post_type
+				};
+			}
+
 			if (req.body.image) post.post_image = req.body.image;
 
 			await post.save();
@@ -173,17 +155,11 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 export const updatePost: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			const post: doc<PostInterface> = await Post.findById(req.params.postId);
+			const post: doc<PostInterface> = await Post
+				.findById(req.params.postId)
+				.orFail(new Error('404'));
 
-			if (!post) {
-				res.sendStatus(404);
-				return;
-			}
-
-			if (!res.locals.user._id.equals(post.user.id)) {
-				res.sendStatus(401);
-				return;
-			}
+			if (!res.locals.user._id.equals(post.user.id)) throw new Error('401');
 
 			next();
 		}),
@@ -198,21 +174,13 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors: Result<ValidationError> = validationResult(req);
 
-			if (!errors.isEmpty()) {
-				res.sendStatus(400);
-				return;
-			}
+			if (!errors.isEmpty()) throw new Error('400');
 
-			const updatedPost = await Post.findByIdAndUpdate(
+			await Post.findByIdAndUpdate(
 				{ _id: req.params.postId },
 				{ text: req.body.text },
 				{ new: true }
-			);
-
-			if (!updatedPost) {
-				res.sendStatus(404);
-				return;
-			}
+			).orFail(new Error('404'));
 
 			res.sendStatus(200);
 		}),
@@ -221,29 +189,20 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 export const deletePost: RequestHandler[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			const post: doc<PostInterface> = await Post.findById(req.params.postId);
+			const post: doc<PostInterface> = await Post
+				.findById(req.params.postId)
+				.orFail(new Error('404'));
 
-			if (!post) {
-				res.sendStatus(404);
-				return;
-			}
-
-			if (!res.locals.user._id.equals(post.user.id)) {
-				res.sendStatus(401);
-				return;
-			}
+			if (!res.locals.user._id.equals(post.user.id)) throw new Error('401');
 
 			next();
 		}),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
-			const deletedPost: doc<PostInterface> = await Post.findByIdAndDelete(req.params.postId);
-
-			if (!deletedPost) {
-				res.sendStatus(404);
-				return;
-			}
+			await Post
+				.findByIdAndDelete(req.params.postId)
+				.orFail(new Error('404'));
 
 			res.sendStatus(200);
 		}),

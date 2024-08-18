@@ -6,9 +6,17 @@ import {
 	ValidationError,
 	validationResult
 } from 'express-validator';
-import { req, res, next, doc, UserInterface, CommentInterface, PostInterface } from '../types';
+import {
+	req,
+	res,
+	next,
+	doc,
+	UserInterface,
+	CommentInterface,
+	BaseInterface
+} from '../types';
 import User from '../models/user';
-import Post from '../models/comment';
+import Base from '../models/base';
 import Comment from '../models/comment';
 import { RequestHandler } from 'express';
 import { HydratedDocument, PopulatedDoc } from 'mongoose';
@@ -18,10 +26,7 @@ export const getUserComments: RequestHandler = asyncHandler(
 		const commentCount: number = Number(req.query.commentCount);
 		const batchSize: number = 10;
 
-		if ((!commentCount && commentCount !== 0) || Number.isNaN(commentCount)) {
-			res.sendStatus(400);
-			return;
-		}
+		if ((!commentCount && commentCount !== 0) || Number.isNaN(commentCount)) throw new Error('400');
 
 		const user: doc<UserInterface> = await User
 			.findOne({ username: req.params.username })
@@ -30,12 +35,7 @@ export const getUserComments: RequestHandler = asyncHandler(
 			.populate({
 				path: 'comments',
 				populate: 'comment_count repost_count like_count'
-			});
-
-		if (!user) {
-			res.sendStatus(404);
-			return;
-		}
+			}).orFail(new Error('404'));
 
 		const comments: PopulatedDoc<CommentInterface>[] = user.comments ?? [];
 		const commentBatch: PopulatedDoc<CommentInterface>[] = comments?.slice(
@@ -48,12 +48,8 @@ export const getUserComments: RequestHandler = asyncHandler(
 export const getComment: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
 		const comment: doc<CommentInterface> = await Comment
-			.findById(req.params.commentId);
-
-		if (!comment) {
-			res.sendStatus(404);
-			return;
-		}
+			.findById(req.params.commentId)
+			.orFail(new Error('404'));
 
 		res.send({ comment }).status(200);
 	});
@@ -69,37 +65,11 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors: Result<ValidationError> = validationResult(req);
 
-			if (!errors.isEmpty()) {
-				res.sendStatus(400);
-				return;
-			}
+			if (!errors.isEmpty()) throw new Error('400');
 
-			let parent;
-			let type;
-
-			switch (req.params.parentType) {
-				case 'post':
-					const getPost: doc<PostInterface> = await Post
-						.findById(req.params.parentId);
-					parent = getPost;
-					type = 'Post';
-					break;
-
-				case 'comment':
-					const getComment: doc<CommentInterface> = await Comment
-						.findById(req.params.parentId);
-					parent = getComment;
-					type = 'Comment';
-					break;
-
-				default:
-					break;
-			}
-
-			if (!parent) {
-				res.sendStatus(404);
-				return;
-			}
+			const parent: doc<BaseInterface> = await Base
+				.findById(req.params.parentId)
+				.orFail(new Error('404'));
 
 			const comment: HydratedDocument<CommentInterface> = new Comment({
 				text: req.body.text,
@@ -116,7 +86,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 						parent?._id,
 				parent_post: {
 					post_id: parent?._id,
-					doc_model: type
+					doc_model: parent.post_type
 				}
 			});
 
@@ -131,17 +101,10 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
 			const comment: doc<CommentInterface> = await Comment
-				.findById(req.params.commentId);
+				.findById(req.params.commentId)
+				.orFail(new Error('404'));
 
-			if (!comment) {
-				res.sendStatus(404);
-				return;
-			}
-
-			if (!res.locals.user._id.equals(comment.user.id)) {
-				res.sendStatus(401);
-				return;
-			}
+			if (!res.locals.user._id.equals(comment.user.id)) throw new Error('401');
 
 			next();
 		}),
@@ -156,22 +119,14 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors: Result<ValidationError> = validationResult(req);
 
-			if (!errors.isEmpty()) {
-				res.sendStatus(400);
-				return;
-			}
+			if (!errors.isEmpty()) throw new Error('400');
 
-			const updatedComment = await Comment
+			await Comment
 				.findByIdAndUpdate(
 					{ _id: req.params.commentId },
 					{ text: req.body.text },
 					{ new: true }
-				);
-
-			if (!updatedComment) {
-				res.sendStatus(404);
-				return;
-			}
+				).orFail(new Error('404'));
 
 			res.sendStatus(200);
 		})
@@ -181,30 +136,19 @@ export const deleteComment: RequestHandler[] = [
 	asyncHandler(
 		async (req, res, next) => {
 			const comment: doc<CommentInterface> = await Comment
-				.findById(req.params.commentId);
+				.findById(req.params.commentId)
+				.orFail(new Error('404'));
 
-			if (!comment) {
-				res.sendStatus(404);
-				return;
-			}
-
-			if (!res.locals.user._id.equals(comment.user.id)) {
-				res.sendStatus(401);
-				return;
-			}
+			if (!res.locals.user._id.equals(comment.user.id)) throw new Error('401');
 
 			next();
 		}),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
-			const deletedComment: doc<CommentInterface> = await Comment
-				.findByIdAndDelete(req.params.commentId);
-
-			if (!deletedComment) {
-				res.sendStatus(404);
-				return;
-			}
+			await Comment
+				.findByIdAndDelete(req.params.commentId)
+				.orFail(new Error('404'));
 
 			res.sendStatus(200);
 		}),

@@ -1,7 +1,13 @@
 import asyncHandler from 'express-async-handler';
 import { body, validationResult, ValidationChain } from 'express-validator';
 import bcrypt from 'bcryptjs';
-import { req, res, next, UserInterface } from '../types';
+import {
+	req,
+	res,
+	next,
+	doc,
+	UserInterface
+} from '../types';
 import User from '../models/user';
 import Post from '../models/post';
 import Comment from '../models/comment';
@@ -20,14 +26,8 @@ export const getUser: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
 		const user: PopulatedDoc<UserInterface> | null = await User
 			.findOne({ username: req.params.username })
-			.populate('post_count')
-			.populate('comment_count')
-			.populate('like_count');
-
-		if (!user) {
-			res.sendStatus(404);
-			return;
-		}
+			.populate('post_count comment_count like_count')
+			.orFail(new Error('404'));
 
 		res.send({ user }).status(200);
 	});
@@ -42,7 +42,8 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Username should not be longer than 50 characters.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate usernames.
-			const users: Document<UserInterface>[] = await User.find({ username: req.body.username });
+			const users: Document<UserInterface>[] = await User
+				.find({ username: req.body.username });
 
 			if (users.length > 0) throw new Error('Username already exists.');
 
@@ -74,7 +75,8 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Email length is invalid.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate emails.
-			const users: Document<UserInterface>[] = await User.find({ email: req.body.email });
+			const users: Document<UserInterface>[] = await User
+				.find({ email: req.body.email });
 
 			if (users.length > 0) throw new Error('Email already exists.');
 
@@ -85,10 +87,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors = validationResult(req);
 
-			if (!errors.isEmpty()) {
-				res.sendStatus(400);
-				return;
-			}
+			if (!errors.isEmpty()) throw new Error('400');
 
 			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
 				if (err) throw err;
@@ -109,11 +108,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 export const updateUser: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			if (res.locals.user.username !== req.params.username) {
-				res.sendStatus(401);
-				return;
-			}
-
+			if (res.locals.user.username !== req.params.username) throw new Error('401');
 			next();
 		}),
 
@@ -129,7 +124,8 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Username should not be longer than 50 characters.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate usernames.
-			const users: Document<UserInterface>[] = await User.find({ username: req.body.username });
+			const users: Document<UserInterface>[] = await User
+				.find({ username: req.body.username });
 
 			if (users.length > 0) throw new Error('Username already exists.');
 
@@ -177,7 +173,8 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Email length is invalid.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate emails.
-			const users: Document<UserInterface>[] = await User.find({ email: req.body.email });
+			const users: Document<UserInterface>[] = await User
+				.find({ email: req.body.email });
 
 			if (users.length > 0) throw new Error('Email already exists.');
 
@@ -209,13 +206,14 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next): Promise<void> => {
 			const errors = validationResult(req);
 
-			if (!errors.isEmpty()) {
-				res.sendStatus(400);
-				return;
-			}
+			if (!errors.isEmpty()) throw new Error('400');
+
+			let updatedUser: doc<UserInterface>;
+			let updatedUserPosts;
+			let updatedUserComments;
 
 			if (!req.body.password) {
-				await User.findOneAndUpdate(
+				updatedUser = await User.findOneAndUpdate(
 					{ _id: res.locals.user._id },
 					{ [`${req.params.update}`]: req.body[req.params.update] },
 					{ new: true },
@@ -224,7 +222,7 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 				bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
 					if (err) throw err;
 
-					await User.findOneAndUpdate(
+					updatedUser = await User.findOneAndUpdate(
 						{ _id: res.locals.user._id },
 						{ password: hashedPswd },
 						{ new: true },
@@ -237,21 +235,26 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 				return;
 			}
 
-			// Updates the users posts/comments.
 			if (
 				req.params.update === 'username' ||
 				req.params.update === 'nickname' ||
 				req.params.update === 'pfp'
 			) {
-				await Post.updateMany(
+				updatedUserPosts = await Post.updateMany(
 					{ 'user.id': res.locals.user._id },
 					{ [`user.${req.params.update}`]: req.body[req.params.update] }
 				);
-				await Comment.updateMany(
+				updatedUserComments = await Comment.updateMany(
 					{ 'user.id': res.locals.user._id },
 					{ [`user.${req.params.update}`]: req.body[req.params.update] }
 				);
 			}
+
+			Promise.all([
+				updatedUser,
+				updatedUserPosts,
+				updatedUserComments
+			]);
 
 			res.sendStatus(200);
 		}),
