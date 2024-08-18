@@ -24,6 +24,7 @@ export interface UserInterface {
 }
 
 export interface BaseInterface {
+	post_type: 'Post' | 'Comment';
 	text: string;
 	timestamp: Date;
 	user: {
