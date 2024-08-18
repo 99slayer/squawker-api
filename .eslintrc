@@ -16,7 +16,9 @@
 			"single"
 		],
 		"no-debugger": 0,
+		"no-case-declarations": 0,
 		"@typescript-eslint/no-unused-vars": 0,
-		"@typescript-eslint/no-var-requires": 0
+		"@typescript-eslint/no-var-requires": 0,
+		"@typescript-eslint/ban-ts-comment": 0
 	}
 }
