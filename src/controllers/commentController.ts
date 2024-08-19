@@ -34,15 +34,14 @@ export const getUserComments: RequestHandler = asyncHandler(
 			.populate('comments')
 			.populate({
 				path: 'comments',
-				populate: 'comment_count repost_count like_count'
+				populate: 'comment_count repost_count like_count',
+				options: {
+					skip: commentCount,
+					limit: batchSize
+				}
 			}).orFail(new Error('404'));
 
-		const comments: PopulatedDoc<CommentInterface>[] = user.comments ?? [];
-		const commentBatch: PopulatedDoc<CommentInterface>[] = comments?.slice(
-			commentCount, commentCount + batchSize
-		);
-
-		res.send({ commentBatch }).status(200);
+		res.send({ comments: user.comments }).status(200);
 	});
 
 export const getComment: RequestHandler = asyncHandler(

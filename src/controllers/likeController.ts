@@ -8,10 +8,12 @@ import {
 	UserInterface,
 	BaseInterface,
 	LikeInterface,
+	PostInterface,
 } from '../types';
 import User from '../models/user';
 import Base from '../models/base';
 import Like from '../models/like';
+import { PopulatedDoc, Types } from 'mongoose';
 
 export const getUserLikes: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
@@ -23,28 +25,23 @@ export const getUserLikes: RequestHandler = asyncHandler(
 		const user: doc<UserInterface> = await User
 			.findOne({ username: req.params.username })
 			.select('likes')
-			.populate('likes')
+			.populate({
+				path: 'likes',
+				populate: {
+					path: 'post',
+					populate: 'comment_count repost_count like_count'
+				},
+				options: {
+					skip: likeCount,
+					limit: batchSize
+				}
+			})
 			.orFail(new Error('404'));
 
-		if (user.likes && user.likes.length <= 0) {
-			res.sendStatus(204);
-			return;
-		}
-
-		const likeIds = user.likes?.map((like) => {
-			const postId = 'post' in like! ? like.post : null;
-			return postId;
+		const likeBatch: PopulatedDoc<PostInterface>[] = user.likes!.map((like) => {
+			if (like instanceof Types.ObjectId) return;
+			return like?.post;
 		});
-
-		const batchIds = likeIds?.slice(
-			likeCount,
-			likeCount + batchSize
-		);
-
-		const likeBatch = await Base
-			.find({ _id: { $in: batchIds } })
-			.populate('comment_count repost_count like_count')
-			.orFail(new Error('404'));
 
 		res.send({ likeBatch }).status(200);
 	});
@@ -60,10 +57,9 @@ export const createLike: RequestHandler = asyncHandler(
 			})
 			.orFail(new Error('404'));
 
-		const userLikes = post?.likes?.map((like) => {
-			if (!like) return;
-			const userId = 'user' in like ? like.user.toString() : null;
-			return userId;
+		const userLikes = post.likes?.map((like) => {
+			if (like instanceof Types.ObjectId) return;
+			return like?.user!.toString();
 		});
 
 		// User already likes post.

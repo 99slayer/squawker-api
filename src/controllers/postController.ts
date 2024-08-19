@@ -89,15 +89,14 @@ export const getUserPosts: RequestHandler = asyncHandler(
 			.populate('posts')
 			.populate({
 				path: 'posts',
-				populate: 'comment_count repost_count like_count'
+				populate: 'comment_count repost_count like_count',
+				options: {
+					skip: postCount,
+					limit: batchSize
+				}
 			}).orFail(new Error('404'));
 
-		const posts: PopulatedDoc<PostInterface>[] = user.posts ?? [];
-		const postBatch: PopulatedDoc<PostInterface>[] = posts.slice(
-			postCount, postCount + batchSize
-		);
-
-		res.send({ postBatch }).status(200);
+		res.send({ posts: user.posts }).status(200);
 	});
 
 export const getPost: RequestHandler = asyncHandler(
