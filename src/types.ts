@@ -42,23 +42,23 @@ export interface BaseInterface {
 export interface PostInterface extends BaseInterface {
 	post_type: 'Post';
 	quoted_post?: {
-		post_id: Types.ObjectId;
+		post_id: PopulatedDoc<BaseInterface>;
 		doc_model: 'Post' | 'Comment';
 	}
 }
 
 export interface CommentInterface extends BaseInterface {
 	post_type: 'Comment';
-	root_post: Types.ObjectId;
+	root_post: PopulatedDoc<PostInterface>;
 	parent_post: {
-		post_id: Types.ObjectId;
+		post_id: PopulatedDoc<BaseInterface>;
 		doc_model: 'Post' | 'Comment';
 	};
 }
 
 export interface LikeInterface {
-	timestamp: Date,
-	user: Types.ObjectId;
-	post: Types.ObjectId;
+	timestamp: Date;
+	user: PopulatedDoc<UserInterface>;
+	post: PopulatedDoc<PostInterface>;
 	doc_model: 'Post' | 'Comment';
 }
