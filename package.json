@@ -3,11 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-		"dev": "DEBUG=server nodemon ./src/app.ts",
+    "dev": "DEBUG=server nodemon ./src/app.ts",
     "dev-debug": "DEBUG=server nodemon --exec node -r ts-node/register --inspect ./src/app.ts",
     "start": "nodemon .dist/app.js",
-    "build": "tsc",
-    "generate": "ts-node ./generate-data/seed.ts"
+    "build": "tsc"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -19,7 +18,7 @@
     "dotenv": "^16.4.5",
     "express": "~4.16.1",
     "express-async-handler": "^1.2.0",
-    "express-rate-limit": "^7.3.1",
+    "express-rate-limit": "^7.4.0",
     "express-session": "^1.18.0",
     "express-validator": "^7.1.0",
     "helmet": "^7.1.0",
@@ -32,6 +31,7 @@
   "devDependencies": {
     "@faker-js/faker": "^8.4.1",
     "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.7.5",
     "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/debug": "^4.1.12",
