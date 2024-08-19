@@ -1,4 +1,5 @@
 import express from 'express';
+require('dotenv').config();
 import path from 'path';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
@@ -7,10 +8,12 @@ import { initialize } from './passportConfig';
 import { req, res, next } from './types';
 import http, { Server } from 'http';
 import https from 'https';
-require('dotenv').config();
 import logger from 'morgan';
 import Debug from 'debug';
 import cors from 'cors';
+import compression from 'compression';
+import helmet from 'helmet';
+import limit from 'express-rate-limit';
 const debug = Debug('server');
 
 import apiRouter from './routes/api';
@@ -20,13 +23,23 @@ const app = express();
 import mongoose from 'mongoose';
 mongoose.set('strictQuery', false);
 
-const db: string | undefined = process.env.PROD_DB || process.env.TEST_DB;
+type db = string | undefined;
+const db: db = process.env.PROD_DB || process.env.TEST_DB;
 
 main().catch((err) => console.log(err));
 async function main(): Promise<void> {
 	if (!db) throw new Error('db undefined.');
 	await mongoose.connect(db);
 }
+
+app.use(compression());
+app.use(helmet());
+
+const limiter = limit({
+	windowMs: 60000, // 1 min
+	max: 1
+});
+app.use(limiter);
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -59,22 +72,18 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use((req: req, res: res, next: next): res | next | void => {
-	console.log('user is authenticated:', req.isAuthenticated());
+	if (req.url === '/login' || req.url === '/signup') return next();
+	if (!req.isAuthenticated()) throw new Error('401');
 
-	if (req.url === '/login') return next();
-	if (!req.isAuthenticated()) {
-		return res.sendStatus(401);
-	}
-	console.log('user =>', req.user);
 	res.locals.user = req.user;
-
 	next();
 });
 
 app.use('/', apiRouter);
 
 // ---------------
-const port: string | number | boolean = normalizePort(process.env.PORT || '3000');
+type port = string | number | boolean;
+const port: port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 
 const server: Server = https.createServer(
