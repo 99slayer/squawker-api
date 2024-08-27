@@ -35,7 +35,9 @@ const CommentSchema = new Schema<CommentInterface>(
 // HOOKS
 CommentSchema.pre('findOneAndDelete', async function (next) {
 	const query: FilterQuery<AnyObject> = this.getQuery();
-	const comment: doc<CommentInterface> = await this.model.findOne(query);
+	const comment: doc<CommentInterface> = await this.model
+		.findOne(query)
+		.orFail(new Error('404'));
 
 	const likesDeleted: mongoose.mongo.DeleteResult = await Like
 		.deleteMany({ post: comment?._id });
@@ -46,7 +48,9 @@ CommentSchema.pre('findOneAndDelete', async function (next) {
 
 CommentSchema.pre('deleteMany', async function (next) {
 	const query: FilterQuery<AnyObject> = this.getQuery();
-	const comment: doc<CommentInterface> = await this.model.findOne(query);
+	const comment: doc<CommentInterface> = await this.model
+		.findOne(query)
+		.orFail(new Error('404'));
 
 	const commentsDeleted: mongoose.mongo.DeleteResult =
 		await mongoose.model<CommentInterface>('Comment', CommentSchema)
