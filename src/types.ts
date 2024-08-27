@@ -25,15 +25,17 @@ export interface UserInterface {
 
 export interface BaseInterface {
 	post_type: 'Post' | 'Comment';
-	text: string;
-	timestamp: Date;
-	user: {
-		id: Types.ObjectId;
-		username: string;
-		nickname: string;
-		pfp?: string;
-	};
-	post_image?: string;
+	post?: {
+		text: string;
+		timestamp: Date;
+		user: {
+			id: Types.ObjectId;
+			username: string;
+			nickname: string;
+			pfp?: string;
+		};
+		post_image?: string;
+	}
 	comments?: PopulatedDoc<CommentInterface>[];
 	reposts?: PopulatedDoc<PostInterface>[];
 	likes?: PopulatedDoc<LikeInterface>[];
@@ -41,9 +43,20 @@ export interface BaseInterface {
 
 export interface PostInterface extends BaseInterface {
 	post_type: 'Post';
+	repost: boolean;
 	quoted_post?: {
-		post_id: PopulatedDoc<BaseInterface>;
-		doc_model: 'Post' | 'Comment';
+		post_id: PopulatedDoc<BaseInterface>,
+		post: {
+			text: string;
+			timestamp: Date;
+			user: {
+				id: Types.ObjectId;
+				username: string;
+				nickname: string;
+				pfp?: string;
+			};
+			post_image?: string;
+		}
 	}
 }
 

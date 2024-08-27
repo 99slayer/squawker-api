@@ -9,18 +9,25 @@ const Schema = mongoose.Schema;
 
 const PostSchema = new Schema<PostInterface>(
 	{
+		repost: { type: Boolean, required: true },
 		quoted_post: {
 			_id: false,
 			type: {
-				post_id: {
-					type: Schema.Types.ObjectId,
-					refPath: 'doc_model',
-					required: true
-				},
-				doc_model: {
-					type: String,
-					enum: ['Post', 'Comment'],
-					required: true
+				post_id: { type: Schema.Types.ObjectId, required: true },
+				post: {
+					text: { type: String, required: true },
+					timestamp: { type: Date, required: true },
+					user: {
+						id: {
+							type: Schema.Types.ObjectId,
+							ref: 'User',
+							required: true
+						},
+						username: { type: String, required: true },
+						nickname: { type: String, required: true },
+						pfp: { type: String, required: false }
+					},
+					post_image: { type: String, required: false }
 				}
 			},
 			required: false
@@ -31,7 +38,9 @@ const PostSchema = new Schema<PostInterface>(
 // HOOKS
 PostSchema.pre('findOneAndDelete', async function (next) {
 	const query: FilterQuery<AnyObject> = this.getQuery();
-	const post: doc<PostInterface> = await this.model.findOne(query);
+	const post: doc<PostInterface> = await this.model
+		.findOne(query)
+		.orFail(new Error('404'));
 
 	const likesDeleted: mongoose.mongo.DeleteResult = await Like
 		.deleteMany({ post: post?._id });
@@ -42,7 +51,9 @@ PostSchema.pre('findOneAndDelete', async function (next) {
 
 PostSchema.pre('deleteMany', async function (next) {
 	const query: FilterQuery<AnyObject> = this.getQuery();
-	const post: doc<PostInterface> = await this.model.findOne(query);
+	const post: doc<PostInterface> = await this.model
+		.findOne(query)
+		.orFail(new Error('404'));
 
 	const commentsDeleted: mongoose.mongo.DeleteResult = await Comment
 		.deleteMany({ root_post: post?._id });
