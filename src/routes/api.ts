@@ -51,13 +51,18 @@ router.get(
 	err
 );
 router.get(
-	'/:username/post/:postId',
+	'/post/:postId',
 	post.getPost,
 	err
 );
 router.post(
 	'/publish-post/:quotedPostId?',
 	post.createPost,
+	err
+);
+router.post(
+	'/publish-repost/:postId',
+	post.createRepost,
 	err
 );
 router.put(
@@ -78,12 +83,17 @@ router.get(
 	err
 );
 router.get(
+	'/:postId/post-comments',
+	comment.getPostComments,
+	err
+);
+router.get(
 	'/:username/comment/:commentId',
 	comment.getComment,
 	err
 );
 router.post(
-	'/publish-comment/:parentType-:parentId',
+	'/publish-comment/:parentId',
 	comment.createComment,
 	err
 );
