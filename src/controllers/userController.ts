@@ -24,12 +24,24 @@ const innerWhitespace = (string: string) => {
 
 export const getUser: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
-		const user: PopulatedDoc<UserInterface> | null = await User
+		const userDoc: PopulatedDoc<UserInterface> | null = await User
 			.findOne({ username: req.params.username })
 			.populate('post_count comment_count like_count')
 			.orFail(new Error('404'));
 
-		res.send({ user }).status(200);
+		const user: object = {
+			_id: userDoc._id,
+			username: userDoc.username,
+			nickname: userDoc.nickname,
+			join_date: userDoc.join_date,
+			following: userDoc.following,
+			followers: userDoc.followers,
+			post_count: userDoc.post_count,
+			comment_count: userDoc.comment_count,
+			like_count: userDoc.like_count
+		};
+
+		res.send(user).status(200);
 	});
 
 export const createUser: (RequestHandler | ValidationChain)[] = [
@@ -87,7 +99,10 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors = validationResult(req);
 
-			if (!errors.isEmpty()) throw new Error('400');
+			if (!errors.isEmpty()) {
+				console.log(errors);
+				throw new Error('400');
+			}
 
 			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
 				if (err) throw err;
@@ -206,14 +221,13 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next): Promise<void> => {
 			const errors = validationResult(req);
 
-			if (!errors.isEmpty()) throw new Error('400');
-
-			let updatedUser: doc<UserInterface>;
-			let updatedUserPosts;
-			let updatedUserComments;
+			if (!errors.isEmpty()) {
+				console.log(errors);
+				throw new Error('400');
+			}
 
 			if (!req.body.password) {
-				updatedUser = await User.findOneAndUpdate(
+				await User.findOneAndUpdate(
 					{ _id: res.locals.user._id },
 					{ [`${req.params.update}`]: req.body[req.params.update] },
 					{ new: true },
@@ -222,7 +236,7 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 				bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
 					if (err) throw err;
 
-					updatedUser = await User.findOneAndUpdate(
+					await User.findOneAndUpdate(
 						{ _id: res.locals.user._id },
 						{ password: hashedPswd },
 						{ new: true },
@@ -235,26 +249,60 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 				return;
 			}
 
-			if (
-				req.params.update === 'username' ||
-				req.params.update === 'nickname' ||
-				req.params.update === 'pfp'
-			) {
-				updatedUserPosts = await Post.updateMany(
-					{ 'user.id': res.locals.user._id },
-					{ [`user.${req.params.update}`]: req.body[req.params.update] }
-				);
-				updatedUserComments = await Comment.updateMany(
-					{ 'user.id': res.locals.user._id },
-					{ [`user.${req.params.update}`]: req.body[req.params.update] }
-				);
-			}
+			const userFields: string[] = ['username', 'nickname', 'pfp'];
 
-			Promise.all([
-				updatedUser,
-				updatedUserPosts,
-				updatedUserComments
-			]);
+			if (
+				userFields.includes(req.params.update)
+			) {
+				Post.bulkWrite([
+					// update posts
+					{
+						updateMany: {
+							filter: { 'post_data.user.id': res.locals.user._id },
+							update: { [`post_data.user.${req.params.update}`]: req.body[req.params.update] },
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'post.user.id': res.locals.user._id },
+							update: { [`post.user.${req.params.update}`]: req.body[req.params.update] },
+						}
+					},
+					// update quotePosts
+					{
+						updateMany: {
+							filter: { 'quoted_post.post_data.user.id': res.locals.user._id },
+							update: { [`quoted_post.post_data.user.${req.params.update}`]: req.body[req.params.update] },
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'quoted_post.post.user.id': res.locals.user._id },
+							update: { [`quoted_post.post.user.${req.params.update}`]: req.body[req.params.update] },
+						}
+					}
+				]).catch((err) => {
+					throw err;
+				});
+
+				Comment.bulkWrite([
+					// update comments
+					{
+						updateMany: {
+							filter: { 'post_data.user.id': res.locals.user._id },
+							update: { [`post_data.user.${req.params.update}`]: req.body[req.params.update] },
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'post.user.id': res.locals.user._id },
+							update: { [`post.user.${req.params.update}`]: req.body[req.params.update] },
+						}
+					},
+				]).catch((err) => {
+					throw err;
+				});
+			}
 
 			res.sendStatus(200);
 		}),
