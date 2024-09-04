@@ -4,8 +4,7 @@ const Schema = mongoose.Schema;
 
 const BaseSchema = new Schema<BaseInterface>(
 	{
-		post: {
-			text: { type: String, required: true },
+		post_data: {
 			timestamp: { type: Date, required: true },
 			user: {
 				id: {
@@ -17,7 +16,21 @@ const BaseSchema = new Schema<BaseInterface>(
 				nickname: { type: String, required: true },
 				pfp: { type: String, required: false }
 			},
-			post_image: { type: String, required: false }
+		},
+		post: {
+			timestamp: { type: Date, required: true },
+			text: { type: String },
+			post_image: { type: String },
+			user: {
+				id: {
+					type: Schema.Types.ObjectId,
+					ref: 'User',
+					required: true
+				},
+				username: { type: String, required: true },
+				nickname: { type: String, required: true },
+				pfp: { type: String, required: false }
+			},
 		}
 	},
 	{
@@ -39,7 +52,7 @@ BaseSchema.virtual('comments', {
 BaseSchema.virtual('reposts', {
 	ref: 'Post',
 	localField: '_id',
-	foreignField: 'post.quoted_post.post_id'
+	foreignField: 'post_data.repost'
 });
 
 BaseSchema.virtual('likes', {
@@ -58,7 +71,7 @@ BaseSchema.virtual('comment_count', {
 BaseSchema.virtual('repost_count', {
 	ref: 'Post',
 	localField: '_id',
-	foreignField: 'post.quoted_post.post_id',
+	foreignField: 'post_data.repost',
 	count: true
 });
 

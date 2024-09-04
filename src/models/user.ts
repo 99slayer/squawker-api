@@ -31,13 +31,13 @@ const UserSchema = new Schema<UserInterface>(
 UserSchema.virtual('posts', {
 	ref: 'Post',
 	localField: '_id',
-	foreignField: 'user.id',
+	foreignField: 'post_data.user.id',
 });
 
 UserSchema.virtual('comments', {
 	ref: 'Comment',
 	localField: '_id',
-	foreignField: 'user.id',
+	foreignField: 'post.user.id',
 });
 
 UserSchema.virtual('likes', {
@@ -49,14 +49,14 @@ UserSchema.virtual('likes', {
 UserSchema.virtual('post_count', {
 	ref: 'Post',
 	localField: '_id',
-	foreignField: 'user.id',
+	foreignField: 'post_data.user.id',
 	count: true
 });
 
 UserSchema.virtual('comment_count', {
 	ref: 'Comment',
 	localField: '_id',
-	foreignField: 'user.id',
+	foreignField: 'post.user.id',
 	count: true
 });
 

@@ -9,14 +9,31 @@ const Schema = mongoose.Schema;
 
 const PostSchema = new Schema<PostInterface>(
 	{
-		repost: { type: Boolean, required: true },
+		post_data: {
+			timestamp: { type: Date, required: true },
+			repost: {
+				type: Schema.Types.ObjectId,
+				required: false
+			},
+			user: {
+				id: {
+					type: Schema.Types.ObjectId,
+					ref: 'User',
+					required: true
+				},
+				username: { type: String, required: true },
+				nickname: { type: String, required: true },
+				pfp: { type: String, required: false }
+			},
+		},
 		quoted_post: {
-			_id: false,
 			type: {
-				post_id: { type: Schema.Types.ObjectId, required: true },
-				post: {
-					text: { type: String, required: true },
+				post_data: {
 					timestamp: { type: Date, required: true },
+					repost: {
+						type: Schema.Types.ObjectId,
+						required: false
+					},
 					user: {
 						id: {
 							type: Schema.Types.ObjectId,
@@ -27,8 +44,23 @@ const PostSchema = new Schema<PostInterface>(
 						nickname: { type: String, required: true },
 						pfp: { type: String, required: false }
 					},
-					post_image: { type: String, required: false }
-				}
+				},
+				post: {
+					timestamp: { type: Date, required: true },
+					text: { type: String },
+					post_image: { type: String },
+					user: {
+						id: {
+							type: Schema.Types.ObjectId,
+							ref: 'User',
+							required: true
+						},
+						username: { type: String, required: true },
+						nickname: { type: String, required: true },
+						pfp: { type: String, required: false }
+					},
+				},
+				quoted_post: { type: Schema.Types.ObjectId }
 			},
 			required: false
 		},
@@ -70,6 +102,12 @@ PostSchema.virtual('direct_replies', {
 	ref: 'Comment',
 	localField: '_id',
 	foreignField: 'parent_post.post_id'
+});
+
+PostSchema.virtual('quoted', {
+	ref: 'Post',
+	localField: '_id',
+	foreignField: 'quoted_post._id'
 });
 
 export default Base.discriminator<PostInterface>('Post', PostSchema);
