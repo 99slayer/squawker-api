@@ -62,7 +62,7 @@ export const createLike: RequestHandler = asyncHandler(
 			return like?.user!.toString();
 		});
 
-		// User already likes post.
+		// Checks if user already likes post.
 		if (userLikes?.includes(res.locals.user._id.toString())) throw new Error('400');
 
 		const like = new Like({
