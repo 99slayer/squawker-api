@@ -14,7 +14,12 @@ export const login = (req: req, res: res, next: next): res | next | void => {
 				return next(err);
 			}
 
-			return res.sendStatus(200);
+			const data: object = {
+				username: user.username,
+				nickname: user.nickname
+			};
+
+			return res.send(data).status(200);
 		});
 	})(req, res, next);
 };
