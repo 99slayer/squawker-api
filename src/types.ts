@@ -60,6 +60,7 @@ export interface BaseInterface {
 	post_type: 'Post' | 'Comment';
 	post_data: BaseData;
 	post: BasePost;
+	quoted_post?: BaseInterface;
 	comments?: PopulatedDoc<CommentInterface>[];
 	reposts?: PopulatedDoc<PostInterface>[];
 	likes?: PopulatedDoc<LikeInterface>[];
