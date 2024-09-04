@@ -8,6 +8,7 @@ export type next = NextFunction;
 export type doc<I> = (Document<unknown, object, I> & I & { _id: Types.ObjectId }) | null;
 
 export interface UserInterface {
+	_id: Types.ObjectId;
 	username: string;
 	password: string;
 	email: string;
@@ -21,43 +22,57 @@ export interface UserInterface {
 	posts?: PopulatedDoc<PostInterface>[];
 	comments?: PopulatedDoc<CommentInterface>[];
 	likes?: PopulatedDoc<LikeInterface>[];
+	post_count?: number;
+	comment_count?: number;
+	like_count?: number;
 }
 
-export interface BaseInterface {
-	post_type: 'Post' | 'Comment';
-	post?: {
-		text: string;
-		timestamp: Date;
-		user: {
-			id: Types.ObjectId;
-			username: string;
-			nickname: string;
-			pfp?: string;
-		};
-		post_image?: string;
+type BasePost = {
+	timestamp: string;
+	text: string;
+	post_image?: string;
+	user: {
+		id: Types.ObjectId;
+		username: string;
+		nickname: string;
+		pfp?: string;
 	}
+}
+
+type BaseData = {
+	timestamp: Date;
+	user: {
+		id: Types.ObjectId;
+		username: string;
+		nickname: string;
+		pfp: string;
+	}
+}
+
+type Repost = {
+	repost: Types.ObjectId;
+}
+
+type PostData = BaseData & Repost;
+
+export interface BaseInterface {
+	_id: Types.ObjectId;
+	post_type: 'Post' | 'Comment';
+	post_data: BaseData;
+	post: BasePost;
 	comments?: PopulatedDoc<CommentInterface>[];
 	reposts?: PopulatedDoc<PostInterface>[];
 	likes?: PopulatedDoc<LikeInterface>[];
+	direct_replies?: CommentInterface[];
+	quoted?: PostInterface[];
 }
 
 export interface PostInterface extends BaseInterface {
 	post_type: 'Post';
-	repost: boolean;
-	quoted_post?: {
-		post_id: PopulatedDoc<BaseInterface>,
-		post: {
-			text: string;
-			timestamp: Date;
-			user: {
-				id: Types.ObjectId;
-				username: string;
-				nickname: string;
-				pfp?: string;
-			};
-			post_image?: string;
-		}
-	}
+	post_data: PostData;
+	quoted_post?: BaseInterface;
+	direct_replies?: CommentInterface[];
+	quoted?: PostInterface[];
 }
 
 export interface CommentInterface extends BaseInterface {
