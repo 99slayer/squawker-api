@@ -37,7 +37,7 @@ app.use(helmet());
 
 const limiter = limit({
 	windowMs: 60000, // 1 min
-	max: 1
+	max: 200
 });
 app.use(limiter);
 
@@ -75,7 +75,15 @@ app.use((req: req, res: res, next: next): res | next | void => {
 	if (req.url === '/login' || req.url === '/signup') return next();
 	if (!req.isAuthenticated()) throw new Error('401');
 
-	res.locals.user = req.user;
+	const userData: Express.User = {
+		_id: req.user._id,
+		username: req.user.username,
+		nickname: req.user.nickname,
+		email: req.user.email,
+		password: req.user.password,
+	};
+
+	res.locals.user = userData;
 	next();
 });
 

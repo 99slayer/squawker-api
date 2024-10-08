@@ -37,7 +37,7 @@ UserSchema.virtual('posts', {
 UserSchema.virtual('comments', {
 	ref: 'Comment',
 	localField: '_id',
-	foreignField: 'post.user.id',
+	foreignField: 'post_data.user.id',
 });
 
 UserSchema.virtual('likes', {
@@ -56,7 +56,8 @@ UserSchema.virtual('post_count', {
 UserSchema.virtual('comment_count', {
 	ref: 'Comment',
 	localField: '_id',
-	foreignField: 'post.user.id',
+	foreignField: 'post_data.user.id',
+	match: { 'post_data.repost': false },
 	count: true
 });
 

@@ -1,18 +1,21 @@
 import asyncHandler from 'express-async-handler';
-import { body, validationResult, ValidationChain } from 'express-validator';
+import { body, validationResult, ValidationChain, Result, ValidationError } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import {
 	req,
 	res,
 	next,
 	doc,
-	UserInterface
+	UserInterface,
+	followData,
+	LocalUser
 } from '../types';
 import User from '../models/user';
 import Post from '../models/post';
 import Comment from '../models/comment';
-import { Document, HydratedDocument, PopulatedDoc } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
 import { RequestHandler } from 'express';
+import passport from 'passport';
 
 const innerWhitespace = (string: string) => {
 	if (/\s/.test(string)) {
@@ -24,25 +27,163 @@ const innerWhitespace = (string: string) => {
 
 export const getUser: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
-		const userDoc: PopulatedDoc<UserInterface> | null = await User
+		const userDoc: doc<UserInterface> = await User
 			.findOne({ username: req.params.username })
+			.select('-password -email')
 			.populate('post_count comment_count like_count')
 			.orFail(new Error('404'));
 
-		const user: object = {
-			_id: userDoc._id,
-			username: userDoc.username,
-			nickname: userDoc.nickname,
-			join_date: userDoc.join_date,
-			following: userDoc.following,
-			followers: userDoc.followers,
-			post_count: userDoc.post_count,
-			comment_count: userDoc.comment_count,
-			like_count: userDoc.like_count
-		};
+		let user = userDoc;
+		if (user.followers.includes(res.locals.user._id)) {
+			user = userDoc.toObject();
+			user.isFollowing = true;
+		}
 
 		res.send(user).status(200);
-	});
+	}
+);
+
+export const getUsers: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		const userCount: number = Number(req.query.userCount);
+		const batchSize: number = 10;
+
+		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('400');
+
+		const users: doc<UserInterface>[] = await User
+			.find({ username: { $ne: res.locals.user.username } })
+			.skip(userCount)
+			.limit(batchSize)
+			.select('-password -email')
+			.sort({ username: 1 })
+			.orFail(new Error('404'));
+
+		const userList: doc<UserInterface>[] = [];
+		for (let i = 0; i < users.length; i++) {
+			let user: doc<UserInterface> = users[i];
+
+			if (user?.username === res.locals.user.username) continue;
+			if (user?.followers.includes(res.locals.user._id)) {
+				user = users[i]!.toObject();
+				user.isFollowing = true;
+			}
+
+			userList.push(user);
+		}
+
+		res.send(userList).status(200);
+	}
+);
+
+export const getFollowers: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		const userCount: number = Number(req.query.userCount);
+		const batchSize: number = 20;
+
+		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('400');
+
+		const user: UserInterface = await User
+			.findOne({ username: req.params.username })
+			.orFail(new Error('404'));
+
+		const followers: UserInterface[] = await User
+			.find({ following: user._id })
+			.skip(userCount)
+			.limit(batchSize)
+			.orFail(new Error('404'));
+
+		const followerData: followData[] = followers.map(doc => {
+			const data: followData = {
+				username: doc.username,
+				nickname: doc.nickname,
+				pfp: doc.pfp,
+				profileText: doc.profile_text,
+				isFollowing: doc.followers.includes(res.locals.user._id)
+			};
+
+			return data;
+		});
+
+		res.send(followerData).status(200);
+	}
+);
+
+export const getFollowing: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		const userCount: number = Number(req.query.userCount);
+		const batchSize: number = 4;
+
+		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('400');
+
+		const user: UserInterface = await User
+			.findOne({ username: req.params.username })
+			.orFail(new Error('404'));
+
+		const following: UserInterface[] = await User
+			.find({ followers: user._id })
+			.skip(userCount)
+			.limit(batchSize)
+			.orFail(new Error('404'));
+
+		const followingData: followData[] = following.map(doc => {
+			const data: followData = {
+				username: doc.username,
+				nickname: doc.nickname,
+				pfp: doc.pfp,
+				profileText: doc.profile_text,
+				isFollowing: doc.followers.includes(res.locals.user._id)
+			};
+
+			return data;
+		});
+
+		res.send(followingData).status(200);
+	}
+);
+
+export const follow: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		if (req.params.username === res.locals.user.username) throw new Error('404');
+		const user: doc<UserInterface> = await User
+			.findOne({ username: req.params.username })
+			.orFail(new Error('404'));
+
+		if (user?.followers.includes(res.locals.user._id)) {
+			res.sendStatus(200);
+			return;
+		}
+
+		await User.findOneAndUpdate(
+			{ _id: res.locals.user._id },
+			{ $push: { following: user?._id } },
+			{ new: true },
+		);
+
+		await user?.updateOne({ $push: { followers: res.locals.user._id } });
+		res.sendStatus(200);
+	}
+);
+
+export const unfollow: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		const user: doc<UserInterface> = await User
+			.findOne({ username: req.params.username });
+
+		if (!user?.followers.includes(res.locals.user._id)) {
+			res.sendStatus(200);
+			return;
+		}
+
+		await User.findOneAndUpdate(
+			{ _id: res.locals.user._id },
+			{ $pull: { following: user._id } },
+			{ new: true },
+		);
+		await user.updateOne({ $pull: { followers: res.locals.user._id } });
+
+		res.sendStatus(200);
+	}
+);
 
 export const createUser: (RequestHandler | ValidationChain)[] = [
 	body('username')
@@ -54,7 +195,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Username should not be longer than 50 characters.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate usernames.
-			const users: Document<UserInterface>[] = await User
+			const users: UserInterface[] = await User
 				.find({ username: req.body.username });
 
 			if (users.length > 0) throw new Error('Username already exists.');
@@ -87,7 +228,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Email length is invalid.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate emails.
-			const users: Document<UserInterface>[] = await User
+			const users: UserInterface[] = await User
 				.find({ email: req.body.email });
 
 			if (users.length > 0) throw new Error('Email already exists.');
@@ -97,7 +238,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
-			const errors = validationResult(req);
+			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) {
 				console.log(errors);
@@ -115,18 +256,43 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 				});
 
 				await user.save();
-				res.sendStatus(200);
+
+				// authenticates and serializes user
+				passport.authenticate(
+					'local',
+					function (err: unknown, user: LocalUser): res | next | void {
+						if (err) { return next(err); }
+						if (!user) {
+							return res.sendStatus(404);
+						}
+
+						req.login(user, (err) => {
+							if (err) {
+								return next(err);
+							}
+
+							const data: {
+								username: string,
+								nickname: string
+							} = {
+								username: user.username,
+								nickname: user.nickname
+							};
+
+							return res.send(data).status(200);
+						});
+					})(req, res, next);
 			});
 		}),
 ];
 
-export const updateUser: (RequestHandler | ValidationChain)[] = [
+export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
 			if (res.locals.user.username !== req.params.username) throw new Error('401');
 			next();
-		}),
-
+		}
+	),
 	body('username')
 		.if((value, { req }) => {
 			return req.body.username;
@@ -139,13 +305,195 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 		.withMessage('Username should not be longer than 50 characters.')
 		.custom(async (value, { req }) => {
 			// Checks for duplicate usernames.
-			const users: Document<UserInterface>[] = await User
+			const users: UserInterface[] = await User
 				.find({ username: req.body.username });
 
 			if (users.length > 0) throw new Error('Username already exists.');
 
 			return true;
 		}),
+	body('email')
+		.if((value, { req }) => {
+			return req.body.email;
+		})
+		.trim()
+		.isEmail()
+		.withMessage('Invalid email.')
+		.isLength({ min: 10, max: 150 })
+		.withMessage('Email length is invalid.')
+		.custom(async (value, { req }) => {
+			// Checks for duplicate emails.
+			const users: UserInterface[] = await User
+				.find({ email: req.body.email });
+
+			if (users.length > 0) throw new Error('Email already exists.');
+
+			return true;
+		}),
+	body('nickname')
+		.if((value, { req }) => {
+			return req.body.nickname;
+		})
+		.trim()
+		.isLength({ min: 1, max: 50 })
+		.withMessage('Nickname must be between 1-50 characters long.'),
+	body('profile_text')
+		.if((value, { req }) => {
+			return req.body.profile_text;
+		})
+		.trim()
+		.isLength({ max: 1000 })
+		.withMessage('Profile text exceeds character limit.'),
+	body('profile_header')
+		.if((value, { req }) => {
+			return req.body.profile_header;
+		})
+		.trim()
+		.isLength({ max: 100 })
+		.withMessage('Profile header url exceeds character limit.'),
+
+	asyncHandler(
+		async (req, res, next) => {
+			const errors: Result<ValidationError> = validationResult(req);
+
+			if (!errors.isEmpty()) {
+				console.log(errors);
+				throw new Error('400');
+			}
+
+			const originalUser: UserInterface = await User
+				.findById(res.locals.user._id)
+				.orFail(new Error('404'));
+
+			const newUser: doc<UserInterface> = await User
+				.findOneAndUpdate(
+					{ _id: res.locals.user._id },
+					{
+						username: req.body.username ? req.body.username : originalUser.username,
+						password: originalUser.password,
+						email: req.body.email ? req.body.email : originalUser.email,
+						nickname: req.body.nickname ? req.body.nickname : originalUser.nickname,
+						join_date: originalUser.join_date,
+						pfp: req.body.pfp ? req.body.pfp : originalUser.pfp,
+						profile_header: req.body.profile_header ? req.body.profile_header : originalUser.profile_header,
+						profile_text: req.body.profile_text ? req.body.profile_text : originalUser.profile_text,
+						following: originalUser.following,
+						followers: originalUser.followers
+					},
+					{ new: true },
+				).orFail(new Error('404'));
+
+			if (
+				req.body.username ||
+				req.body.nickname ||
+				req.body.pfp
+			) {
+				await Post.bulkWrite([
+					// update posts
+					{
+						updateMany: {
+							filter: { 'post_data.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'post_data.user.username': req.body.username ? req.body.username : originalUser.username,
+									'post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
+									'post_data.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+								}
+							},
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'post.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'post.user.username': req.body.username ? req.body.username : originalUser.username,
+									'post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
+									'post.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+								}
+							},
+						}
+					},
+					// update quotePosts
+					{
+						updateMany: {
+							filter: { 'quoted_post.post_data.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'quoted_post.post_data.user.username': req.body.username ? req.body.username : originalUser.username,
+									'quoted_post.post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
+									'quoted_post.post_data.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+								}
+							},
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'quoted_post.post.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'quoted_post.post.user.username': req.body.username ? req.body.username : originalUser.username,
+									'quoted_post.post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
+									'quoted_post.post.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+								}
+							},
+						}
+					}
+				]).catch((err) => {
+					throw err;
+				});
+
+				await Comment.bulkWrite([
+					// update comments
+					{
+						updateMany: {
+							filter: { 'post_data.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'post_data.user.username': req.body.username ? req.body.username : originalUser.username,
+									'post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
+									'post_data.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+								}
+							},
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'post.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'post.user.username': req.body.username ? req.body.username : originalUser.username,
+									'post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
+									'post.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+								}
+							},
+						}
+					},
+				]).catch((err) => {
+					throw err;
+				});
+			}
+
+			const data: {
+				username: string,
+				nickname: string
+			} = {
+				username: newUser.username,
+				nickname: newUser.nickname
+			};
+
+			res.send(data).status(200);
+		}
+	)
+];
+
+export const updateUserSecurity: (RequestHandler | ValidationChain)[] = [
+	asyncHandler(
+		async (req, res, next) => {
+			if (res.locals.user.username !== req.params.username) throw new Error('401');
+			next();
+		}
+	),
 	body('password')
 		.if((value, { req }) => {
 			return req.body.password;
@@ -177,133 +525,28 @@ export const updateUser: (RequestHandler | ValidationChain)[] = [
 
 			return true;
 		}),
-	body('email')
-		.if((value, { req }) => {
-			return req.body.email;
-		})
-		.trim()
-		.isEmail()
-		.withMessage('Invalid email.')
-		.isLength({ min: 10, max: 150 })
-		.withMessage('Email length is invalid.')
-		.custom(async (value, { req }) => {
-			// Checks for duplicate emails.
-			const users: Document<UserInterface>[] = await User
-				.find({ email: req.body.email });
-
-			if (users.length > 0) throw new Error('Email already exists.');
-
-			return true;
-		}),
-	body('nickname')
-		.if((value, { req }) => {
-			return req.body.nickname;
-		})
-		.trim()
-		.isLength({ min: 1, max: 50 })
-		.withMessage('Nickname must be between 1-50 characters long.'),
-	body('profile_text')
-		.if((value, { req }) => {
-			return req.body.profile_text;
-		})
-		.trim()
-		.isLength({ max: 1000 })
-		.withMessage('Profile text exceeds character limit.'),
-	body('profile_header')
-		.if((value, { req }) => {
-			return req.body.profile_header;
-		})
-		.trim()
-		.isLength({ max: 100 })
-		.withMessage('Profile header url exceeds character limit.'),
 
 	asyncHandler(
-		async (req: req, res: res, next: next): Promise<void> => {
-			const errors = validationResult(req);
+		async (req, res, next) => {
+			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) {
 				console.log(errors);
 				throw new Error('400');
 			}
 
-			if (!req.body.password) {
+			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
+				if (err) throw err;
+
 				await User.findOneAndUpdate(
 					{ _id: res.locals.user._id },
-					{ [`${req.params.update}`]: req.body[req.params.update] },
+					{ password: hashedPswd },
 					{ new: true },
 				);
-			} else {
-				bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
-					if (err) throw err;
 
-					await User.findOneAndUpdate(
-						{ _id: res.locals.user._id },
-						{ password: hashedPswd },
-						{ new: true },
-					);
-
-					res.sendStatus(200);
-					return;
-				});
-
+				res.sendStatus(200);
 				return;
-			}
-
-			const userFields: string[] = ['username', 'nickname', 'pfp'];
-
-			if (
-				userFields.includes(req.params.update)
-			) {
-				Post.bulkWrite([
-					// update posts
-					{
-						updateMany: {
-							filter: { 'post_data.user.id': res.locals.user._id },
-							update: { [`post_data.user.${req.params.update}`]: req.body[req.params.update] },
-						}
-					},
-					{
-						updateMany: {
-							filter: { 'post.user.id': res.locals.user._id },
-							update: { [`post.user.${req.params.update}`]: req.body[req.params.update] },
-						}
-					},
-					// update quotePosts
-					{
-						updateMany: {
-							filter: { 'quoted_post.post_data.user.id': res.locals.user._id },
-							update: { [`quoted_post.post_data.user.${req.params.update}`]: req.body[req.params.update] },
-						}
-					},
-					{
-						updateMany: {
-							filter: { 'quoted_post.post.user.id': res.locals.user._id },
-							update: { [`quoted_post.post.user.${req.params.update}`]: req.body[req.params.update] },
-						}
-					}
-				]).catch((err) => {
-					throw err;
-				});
-
-				Comment.bulkWrite([
-					// update comments
-					{
-						updateMany: {
-							filter: { 'post_data.user.id': res.locals.user._id },
-							update: { [`post_data.user.${req.params.update}`]: req.body[req.params.update] },
-						}
-					},
-					{
-						updateMany: {
-							filter: { 'post.user.id': res.locals.user._id },
-							update: { [`post.user.${req.params.update}`]: req.body[req.params.update] },
-						}
-					},
-				]).catch((err) => {
-					throw err;
-				});
-			}
-
-			res.sendStatus(200);
-		}),
+			});
+		}
+	)
 ];

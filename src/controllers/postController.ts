@@ -11,17 +11,17 @@ import {
 	req,
 	res,
 	next,
-	doc,
-	UserInterface,
 	PostInterface,
 	BaseInterface,
 } from '../types';
+import User from '../models/user';
 import Base from '../models/base';
 import Post from '../models/post';
-import User from '../models/user';
-import { PopulatedDoc, HydratedDocument, Types } from 'mongoose';
+import Comment from '../models/comment';
+import Like from '../models/like';
+import { HydratedDocument, Types } from 'mongoose';
+import { checkPostLikes } from '../util';
 
-// Something like an in memory database would help to scale this query.
 export const home: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
 		const postCount: number = Number(req.query.postCount);
@@ -29,71 +29,39 @@ export const home: RequestHandler = asyncHandler(
 
 		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('400');
 
-		const userPosts: doc<UserInterface> = await User
-			.findById(res.locals.user._id)
-			.select('posts')
-			.populate({
-				path: 'posts',
-				select: 'post_data',
-				transform: (doc, id) => {
-					return { _id: doc._id, post_data: doc.post_data };
-				}
-			}).orFail(new Error('404'));
-
-		const user: doc<UserInterface> = await User
+		const following: Types.ObjectId[] = await User
 			.findById(res.locals.user._id)
 			.select('following')
-			.populate({
-				path: 'following',
-				select: 'posts',
-				populate: {
-					path: 'posts',
-					select: 'post_data',
-					transform: (doc, id) => {
-						return { _id: doc._id, post_data: doc.post_data };
-					}
-				},
+			.transform(doc => {
+				return doc?.following;
 			}).orFail(new Error('404'));
 
-		const posts: PopulatedDoc<PostInterface>[] | [] = [...(userPosts?.posts ?? [])];
-		for (let i: number = 0; i < user.following.length; i++) {
-			const followedUser: PopulatedDoc<UserInterface> = user.following[i];
+		const posts: BaseInterface[] = await Base
+			.find({
+				$or: [
+					{
+						'post_data.user.id': res.locals.user._id,
+						$or: [
+							{ 'post_data.repost': true },
+							{ post_type: 'Post' }
+						]
+					},
+					{
+						'post_data.user.id': { $in: following },
+						$or: [
+							{ 'post_data.repost': true },
+							{ post_type: 'Post' }
+						]
+					}
+				]
+			})
+			.skip(postCount)
+			.limit(batchSize)
+			.populate('direct_comment_count repost_count like_count')
+			.sort({ 'post_data.timestamp': -1 });
 
-			if (followedUser instanceof Types.ObjectId) return;
-			posts.push(...(followedUser?.posts ?? []));
-		}
-
-		if (posts.length === 0) {
-			res.send({ postBatch: [] }).status(200);
-			return;
-		}
-
-		if (posts.length === 1) {
-			const postBatch: PopulatedDoc<PostInterface> = await Post
-				.findById(posts[0]!._id)
-				.orFail(new Error('404'));
-
-			res.send({ postBatch }).status(200);
-			return;
-		} else {
-			posts.sort((
-				a: PopulatedDoc<PostInterface>,
-				b: PopulatedDoc<PostInterface>
-			) => {
-				if (a instanceof Types.ObjectId || b instanceof Types.ObjectId) {
-					throw new Error('Problems populating posts.');
-				} else {
-					return a!.post_data.timestamp.getTime() - b!.post_data.timestamp.getTime();
-				}
-			});
-
-			const batchIds = posts.slice(postCount, postCount + batchSize);
-			const postBatch = await Post
-				.find({ _id: { $in: batchIds } })
-				.populate('comment_count repost_count like_count');
-
-			res.send({ postBatch }).status(200);
-		}
+		await checkPostLikes(posts, res.locals.user._id);
+		res.send(posts).status(200);
 	});
 
 export const getUserPosts: RequestHandler = asyncHandler(
@@ -103,30 +71,26 @@ export const getUserPosts: RequestHandler = asyncHandler(
 
 		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('400');
 
-		const user: doc<UserInterface> = await User
-			.findOne({ username: req.params.username })
-			.select('posts')
-			.populate('posts')
-			.populate({
-				path: 'posts',
-				populate: 'comment_count repost_count like_count',
-				options: {
-					skip: postCount,
-					limit: batchSize
-				}
-			}).orFail(new Error('404'));
+		const posts: PostInterface[] = await Post
+			.find({ 'post_data.user.username': req.params.username })
+			.skip(postCount)
+			.limit(batchSize)
+			.populate('direct_comment_count repost_count like_count')
+			.sort({ 'post_data.timestamp': -1 });
 
-		res.send({ posts: user.posts }).status(200);
+		await checkPostLikes(posts, res.locals.user._id);
+		res.send(posts).status(200);
 	});
 
 export const getPost: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
-		const post: doc<BaseInterface> = await Base
+		const post: PostInterface = await Post
 			.findById(req.params.postId)
-			.populate('comment_count repost_count like_count')
+			.populate('direct_comment_count repost_count like_count')
 			.orFail(new Error('404'));
 
-		res.send({ post }).status(200);
+		await checkPostLikes(post, res.locals.user._id);
+		res.send(post).status(200);
 	});
 
 export const createPost: (RequestHandler | ValidationChain)[] = [
@@ -164,32 +128,34 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 				},
 			});
 
+			post.post_data.post_id = post._id;
+
 			if (req.params.quotedPostId) {
-				const quotedPost: doc<BaseInterface> = await Base
+				const quotedPost: BaseInterface = await Base
 					.findById(req.params.quotedPostId)
 					.orFail(new Error('404'));
-
 				post.quoted_post = quotedPost;
 			}
 
 			if (req.body.image) post.post.post_image = req.body.image;
 
 			await post.save();
-			res.sendStatus(200);
+			res.send({ _id: post._id }).status(201);
 		}),
 ];
 
 export const createRepost: RequestHandler | ValidationChain =
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
-			const post: doc<BaseInterface> = await Post
+			const post: PostInterface = await Post
 				.findById(req.params.postId)
 				.orFail(new Error('404'));
 
 			const repost: HydratedDocument<PostInterface> = new Post({
 				post_data: {
+					post_id: post.post_data.post_id,
 					timestamp: new Date,
-					repost: post._id,
+					repost: true,
 					user: {
 						id: res.locals.user._id,
 						username: res.locals.user.username,
@@ -198,23 +164,23 @@ export const createRepost: RequestHandler | ValidationChain =
 					}
 				},
 				post: post.post,
+				quoted_post: post.quoted_post
 			});
 
-			if (post.quoted_post) repost.quoted_post = post.quoted_post;
-
-			await post.save();
-			res.sendStatus(200);
-		});
+			await repost.save();
+			res.send({ _id: repost._id }).status(201);
+		}
+	);
 
 export const updatePost: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
-			const post: doc<PostInterface> = await Post
+			const post: PostInterface = await Post
 				.findById(req.params.postId)
 				.orFail(new Error('404'));
 
 			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('401');
-
+			if (post.post_data.repost) throw new Error('401');
 			next();
 		}),
 
@@ -248,7 +214,7 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 				},
 				{
 					updateMany: {
-						filter: { 'post_data.repost': req.params.postId },
+						filter: { 'post_data.post_id': req.params.postId },
 						update: { 'post.text': req.body.text }
 					}
 				}
@@ -257,43 +223,83 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 			});
 
 			res.sendStatus(200);
-		}),
+		}
+	),
 ];
 
 export const deletePost: RequestHandler[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			const post: doc<PostInterface> = await Post
+			const post: PostInterface = await Post
 				.findById(req.params.postId)
 				.orFail(new Error('404'));
 
 			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('401');
-
 			next();
 		}),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
 			await Post.bulkWrite([
+				// delete post
 				{
 					deleteOne: {
 						filter: { _id: req.params.postId }
 					}
 				},
+				// update quote posts
 				{
 					updateMany: {
 						filter: { 'quoted_post._id': req.params.postId },
-						update: { 'quoted_post.post.text': 'POST WAS REMOVED' }
+						update: {
+							'quoted_post': {
+								'post_data': null,
+								'post': null,
+							}
+						}
 					}
 				},
+				// delete reposts
 				{
 					deleteMany: {
-						filter: { 'post_data.repost': req.params.postId },
+						filter: { 'post_data.post_id': req.params.postId },
 					}
 				}
 			]).catch((err) => {
 				throw err;
 			});
+
+			await Comment.bulkWrite([
+				// update comment root posts
+				{
+					updateMany: {
+						filter: { 'root_post._id': req.params.postId },
+						update: {
+							'root_post': {
+								'post_data': null,
+								'post': null
+							}
+						}
+					}
+				},
+				// update comment parent posts
+				{
+					updateMany: {
+						filter: { 'parent_post._id': req.params.postId },
+						update: {
+							'parent_post': {
+								'post_data': null,
+								'post': null,
+							}
+						}
+					}
+				},
+			]).catch((err) => {
+				throw err;
+			});
+
+			// delete post likes
+			await Like.deleteMany({ post: req.params.postId });
 
 			res.sendStatus(200);
 		}),

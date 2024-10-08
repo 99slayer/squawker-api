@@ -1,37 +1,14 @@
 import mongoose from 'mongoose';
 import { BaseInterface } from '../types';
+import PostDataSchema from './postdata';
+import PostBodySchema from './postbody';
 const Schema = mongoose.Schema;
 
-const BaseSchema = new Schema<BaseInterface>(
+export const BaseSchema = new Schema<BaseInterface>(
 	{
-		post_data: {
-			timestamp: { type: Date, required: true },
-			user: {
-				id: {
-					type: Schema.Types.ObjectId,
-					ref: 'User',
-					required: true
-				},
-				username: { type: String, required: true },
-				nickname: { type: String, required: true },
-				pfp: { type: String, required: false }
-			},
-		},
-		post: {
-			timestamp: { type: Date, required: true },
-			text: { type: String },
-			post_image: { type: String },
-			user: {
-				id: {
-					type: Schema.Types.ObjectId,
-					ref: 'User',
-					required: true
-				},
-				username: { type: String, required: true },
-				nickname: { type: String, required: true },
-				pfp: { type: String, required: false }
-			},
-		}
+		post_data: PostDataSchema,
+		post: PostBodySchema,
+		liked: { type: Boolean, default: false }
 	},
 	{
 		discriminatorKey: 'post_type',
@@ -43,41 +20,45 @@ const BaseSchema = new Schema<BaseInterface>(
 );
 
 // VIRTUALS
-BaseSchema.virtual('comments', {
+BaseSchema.virtual('direct_comments', {
 	ref: 'Comment',
-	localField: '_id',
-	foreignField: 'root_post'
+	localField: 'post_data.post_id',
+	foreignField: 'parent_post._id',
+	match: { 'post_data.repost': false }
 });
 
 BaseSchema.virtual('reposts', {
-	ref: 'Post',
-	localField: '_id',
-	foreignField: 'post_data.repost'
+	ref: 'Base',
+	localField: 'post_data.post_id',
+	foreignField: 'post_data.post_id',
+	match: { 'post_data.repost': true }
 });
 
 BaseSchema.virtual('likes', {
 	ref: 'Like',
-	localField: '_id',
+	localField: 'post_data.post_id',
 	foreignField: 'post'
 });
 
-BaseSchema.virtual('comment_count', {
+BaseSchema.virtual('direct_comment_count', {
 	ref: 'Comment',
-	localField: '_id',
-	foreignField: 'root_post',
+	localField: 'post_data.post_id',
+	foreignField: 'parent_post._id',
+	match: { 'post_data.repost': false },
 	count: true
 });
 
 BaseSchema.virtual('repost_count', {
-	ref: 'Post',
-	localField: '_id',
-	foreignField: 'post_data.repost',
+	ref: 'Base',
+	localField: 'post_data.post_id',
+	foreignField: 'post_data.post_id',
+	match: { 'post_data.repost': true },
 	count: true
 });
 
 BaseSchema.virtual('like_count', {
 	ref: 'Like',
-	localField: '_id',
+	localField: 'post_data.post_id',
 	foreignField: 'post',
 	count: true
 });

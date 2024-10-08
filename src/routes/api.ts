@@ -28,14 +28,44 @@ router.get(
 	user.getUser,
 	err
 );
+router.get(
+	'/users',
+	user.getUsers,
+	err
+);
+router.get(
+	'/user/:username/followers',
+	user.getFollowers,
+	err
+);
+router.get(
+	'/user/:username/following',
+	user.getFollowing,
+	err
+);
+router.put(
+	'/user/follow/:username',
+	user.follow,
+	err
+);
+router.put(
+	'/user/unfollow/:username',
+	user.unfollow,
+	err
+);
 router.post(
 	'/signup',
 	user.createUser,
 	err
 );
 router.put(
-	'/:username/update-:update',
-	user.updateUser,
+	'/:username/account-update',
+	user.updateUserAccount,
+	err
+);
+router.put(
+	'/:username/security-update',
+	user.updateUserSecurity,
 	err
 );
 
@@ -61,7 +91,7 @@ router.post(
 	err
 );
 router.post(
-	'/publish-repost/:postId',
+	'/publish-post-repost/:postId',
 	post.createRepost,
 	err
 );
@@ -83,18 +113,28 @@ router.get(
 	err
 );
 router.get(
-	'/:postId/post-comments',
-	comment.getPostComments,
+	'/:postId/post-replies',
+	comment.getPostReplies,
 	err
 );
 router.get(
-	'/:username/comment/:commentId',
-	comment.getComment,
+	'/:postId/comment-replies',
+	comment.getCommentReplies,
+	err
+);
+router.get(
+	'/comment-group/:commentId',
+	comment.getCommentGroup,
 	err
 );
 router.post(
 	'/publish-comment/:parentId',
 	comment.createComment,
+	err
+);
+router.post(
+	'/publish-comment-repost/:commentId',
+	comment.createRepost,
 	err
 );
 router.put('/edit-comment/:commentId',
@@ -108,18 +148,13 @@ router.delete(
 );
 
 // LIKE ROUTES
-router.get(
-	'/:username/likes',
-	like.getUserLikes,
-	err
-);
 router.post(
 	'/publish-like/:postId',
 	like.createLike,
 	err
 );
 router.delete(
-	'/delete-like/:likeId',
+	'/delete-like/:postId',
 	like.deleteLike,
 	err
 );

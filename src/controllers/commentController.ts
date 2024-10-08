@@ -10,17 +10,16 @@ import {
 	req,
 	res,
 	next,
-	doc,
-	UserInterface,
 	CommentInterface,
 	BaseInterface
 } from '../types';
-import User from '../models/user';
 import Base from '../models/base';
 import Post from '../models/post';
 import Comment from '../models/comment';
+import Like from '../models/like';
 import { RequestHandler } from 'express';
 import { HydratedDocument } from 'mongoose';
+import { checkCommentLikes } from '../util';
 
 export const getUserComments: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
@@ -29,54 +28,73 @@ export const getUserComments: RequestHandler = asyncHandler(
 
 		if ((!commentCount && commentCount !== 0) || Number.isNaN(commentCount)) throw new Error('400');
 
-		const user: doc<UserInterface> = await User
-			.findOne({ username: req.params.username })
-			.select('comments')
-			.populate('comments')
-			.populate({
-				path: 'comments',
-				populate: 'comment_count repost_count like_count',
-				options: {
-					skip: commentCount,
-					limit: batchSize
-				}
-			}).orFail(new Error('404'));
+		const comments: CommentInterface[] = await Comment
+			.find({
+				'post_data.user.username': req.params.username,
+				'post_data.repost': false
+			})
+			.skip(commentCount)
+			.limit(batchSize)
+			.populate('direct_comment_count repost_count like_count root_post.direct_comment_count root_post.repost_count root_post.like_count parent_post.direct_comment_count parent_post.repost_count parent_post.like_count')
+			.sort({ 'post_data.timestamp': -1 });
 
-		res.send({ comments: user.comments }).status(200);
+		await checkCommentLikes(comments, res.locals.user._id);
+		res.send(comments).status(200);
 	});
 
-export const getPostComments: RequestHandler = asyncHandler(
+export const getPostReplies: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next) => {
+		const commentCount: number = Number(req.query.commentCount);
+		const batchSize: number = 2;
+
+		if ((!commentCount && commentCount !== 0) || Number.isNaN(commentCount)) throw new Error('400');
+
+		const comments: CommentInterface[] = await Comment
+			.find({
+				'parent_post._id': req.params.postId,
+				'post_data.repost': false
+			})
+			.skip(commentCount)
+			.limit(batchSize)
+			.populate('direct_comment_count repost_count like_count');
+
+		await checkCommentLikes(comments, res.locals.user._id);
+		res.send(comments).status(200);
+	}
+);
+
+export const getCommentReplies: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
 		const commentCount: number = Number(req.query.commentCount);
 		const batchSize: number = 10;
 
 		if ((!commentCount && commentCount !== 0) || Number.isNaN(commentCount)) throw new Error('400');
 
-		const post: doc<BaseInterface> = await Base
-			.findById(req.params.postId)
-			.select('comments')
-			.populate({
-				path: 'comments',
-				options: {
-					skip: commentCount,
-					limit: batchSize
-				},
-				populate: 'comment_count repost_count like_count'
-			}).orFail(new Error('404'));
+		const comments: CommentInterface[] = await Comment
+			.find({
+				'parent_post._id': req.params.postId,
+				'post_data.repost': false
+			})
+			.skip(commentCount)
+			.limit(batchSize)
+			.populate('direct_comment_count repost_count like_count');
 
-		res.send({ comments: post.comments }).status(200);
+		await checkCommentLikes(comments, res.locals.user._id);
+		res.send(comments).status(200);
 	}
 );
 
-export const getComment: RequestHandler = asyncHandler(
+export const getCommentGroup: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
-		const comment: doc<CommentInterface> = await Comment
+		const comment: CommentInterface = await Comment
 			.findById(req.params.commentId)
-			.populate('comment_count repost_count like_count')
+			.populate('direct_comment_count repost_count like_count root_post.direct_comment_count root_post.repost_count root_post.like_count parent_post.direct_comment_count parent_post.repost_count parent_post.like_count')
 			.orFail(new Error('404'));
 
-		res.send({ comment }).status(200);
-	});
+		await checkCommentLikes(comment, res.locals.user._id);
+		res.send(comment).status(200);
+	}
+);
 
 export const createComment: (RequestHandler | ValidationChain)[] = [
 	body('text')
@@ -94,7 +112,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 				throw new Error('400');
 			}
 
-			const parent: doc<BaseInterface> = await Base
+			const parent: BaseInterface = await Base
 				.findById(req.params.parentId)
 				.orFail(new Error('404'));
 
@@ -118,32 +136,56 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 						pfp: res.locals.user.pfp,
 					},
 				},
-				root_post:
-					'root_post' in parent ?
-						parent?.root_post :
-						parent?._id,
-				parent_post: {
-					post_id: parent?._id,
-					doc_model: parent.post_type
-				}
+
+				parent_post: parent,
+				root_post: parent.root_post || parent.parent_post || null
 			});
 
+			comment.post_data.post_id = comment._id;
 			if (req.body.image) comment.post!.post_image = req.body.image;
 
 			await comment.save();
-			res.sendStatus(200);
+			res.send({ _id: comment._id }).status(200);
 		})
 ];
+
+export const createRepost: RequestHandler | ValidationChain =
+	asyncHandler(
+		async (req: req, res: res, next: next) => {
+			const post: CommentInterface = await Comment
+				.findById(req.params.commentId)
+				.orFail(new Error('404'));
+
+			const repost: HydratedDocument<CommentInterface> = new Comment({
+				post_data: {
+					post_id: post.post_data.post_id,
+					timestamp: new Date,
+					repost: true,
+					user: {
+						id: res.locals.user._id,
+						username: res.locals.user.username,
+						nickname: res.locals.user.nickname,
+						pfp: res.locals.user.pfp,
+					}
+				},
+				post: post.post,
+				parent_post: post.parent_post,
+				root_post: post.root_post,
+			});
+
+			await repost.save();
+			res.send({ _id: repost._id }).status(201);
+		}
+	);
 
 export const updateComment: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			const comment: doc<CommentInterface> = await Comment
+			const comment: CommentInterface = await Comment
 				.findById(req.params.commentId)
 				.orFail(new Error('404'));
 
 			if (!res.locals.user._id.equals(comment.post_data?.user.id)) throw new Error('401');
-
 			next();
 		}),
 
@@ -165,7 +207,7 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 			await Comment
 				.findByIdAndUpdate(
 					{ _id: req.params.commentId },
-					{ text: req.body.text },
+					{ 'post.text': req.body.text },
 					{ new: true }
 				).orFail(new Error('404'));
 
@@ -178,7 +220,7 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 				},
 				{
 					updateMany: {
-						filter: { 'post_data.repost': req.params.commentId },
+						filter: { 'post_data.post_id': req.params.commentId },
 						update: { 'post.text': req.body.text }
 					}
 				}
@@ -193,36 +235,59 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 export const deleteComment: RequestHandler[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			const comment: doc<CommentInterface> = await Comment
+			const comment: CommentInterface = await Comment
 				.findById(req.params.commentId)
 				.orFail(new Error('404'));
 
 			if (!res.locals.user._id.equals(comment.post_data?.user.id)) throw new Error('401');
-
 			next();
 		}),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
-			await Comment
-				.findByIdAndDelete(req.params.commentId)
-				.orFail(new Error('404'));
 
-			await Post.bulkWrite([
+			await Comment.bulkWrite([
+				// delete comment
 				{
-					updateMany: {
-						filter: { 'quoted_post._id': req.params.commentId },
-						update: { 'quoted_post.post.text': 'POST WAS REMOVED' }
+					deleteOne: {
+						filter: { _id: req.params.commentId }
 					}
 				},
+				// delete comment reposts
 				{
 					deleteMany: {
-						filter: { 'post_data.repost': req.params.commentId },
+						filter: { 'post_data.post_id': req.params.commentId }
 					}
-				}
+				},
+				// update child comment parent posts
+				{
+					updateMany: {
+						filter: { 'parent_post._id': req.params.commentId },
+						update: {
+							'parent_post': {
+								'post_data': null,
+								'post': null,
+							}
+						}
+					}
+				},
 			]).catch((err) => {
 				throw err;
 			});
+
+			// update quote posts
+			await Post.updateMany(
+				{ 'quoted_post._id': req.params.commentId },
+				{
+					'quoted_post': {
+						'post_data': null,
+						'post': null
+					}
+				}
+			);
+
+			// delete comment likes
+			await Like.deleteMany({ post: req.params.commentId });
 
 			res.sendStatus(200);
 		}),

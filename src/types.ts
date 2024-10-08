@@ -1,11 +1,39 @@
 import { Request, Response, NextFunction } from 'express';
-import { Document, PopulatedDoc, Types } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type req = Request;
 export type res = Response;
 export type next = NextFunction;
 
 export type doc<I> = (Document<unknown, object, I> & I & { _id: Types.ObjectId }) | null;
+
+declare module 'express-serve-static-core' {
+	interface Request {
+		user: {
+			_id: string;
+			username: string;
+			nickname: string;
+			email: string;
+			password: string;
+		}
+	}
+}
+
+export interface LocalUser {
+	_id: string;
+	username: string;
+	nickname: string;
+	email: string;
+	password: string
+}
+
+export interface followData {
+	username: string;
+	nickname: string;
+	pfp?: string;
+	profileText?: string;
+	isFollowing: boolean;
+}
 
 export interface UserInterface {
 	_id: Types.ObjectId;
@@ -17,14 +45,27 @@ export interface UserInterface {
 	pfp?: string;
 	profile_header?: string;
 	profile_text?: string;
-	following: PopulatedDoc<UserInterface>[];
-	followers: PopulatedDoc<UserInterface>[];
-	posts?: PopulatedDoc<PostInterface>[];
-	comments?: PopulatedDoc<CommentInterface>[];
-	likes?: PopulatedDoc<LikeInterface>[];
+	following: Types.ObjectId[];
+	followers: Types.ObjectId[];
+	isFollowing?: boolean;
+	posts?: PostInterface[];
+	comments?: CommentInterface[];
+	likes?: LikeInterface[];
 	post_count?: number;
 	comment_count?: number;
 	like_count?: number;
+}
+
+type BaseData = {
+	post_id: Types.ObjectId;
+	timestamp: Date;
+	repost?: boolean;
+	user: {
+		id: Types.ObjectId;
+		username: string;
+		nickname: string;
+		pfp: string;
+	}
 }
 
 type BasePost = {
@@ -39,55 +80,38 @@ type BasePost = {
 	}
 }
 
-type BaseData = {
-	timestamp: Date;
-	user: {
-		id: Types.ObjectId;
-		username: string;
-		nickname: string;
-		pfp: string;
-	}
-}
-
-type Repost = {
-	repost: Types.ObjectId;
-}
-
-type PostData = BaseData & Repost;
-
 export interface BaseInterface {
+	liked: boolean;
 	_id: Types.ObjectId;
 	post_type: 'Post' | 'Comment';
 	post_data: BaseData;
 	post: BasePost;
 	quoted_post?: BaseInterface;
-	comments?: PopulatedDoc<CommentInterface>[];
-	reposts?: PopulatedDoc<PostInterface>[];
-	likes?: PopulatedDoc<LikeInterface>[];
-	direct_replies?: CommentInterface[];
-	quoted?: PostInterface[];
+	parent_post?: PostInterface | CommentInterface;
+	root_post?: PostInterface | null;
+	comments?: CommentInterface[];
+	direct_comments?: CommentInterface[];
+	reposts?: PostInterface[];
+	likes?: LikeInterface[];
+	comment_count: number;
+	direct_comment_count: number;
+	repost_count: number;
+	like_count: number;
 }
 
 export interface PostInterface extends BaseInterface {
 	post_type: 'Post';
-	post_data: PostData;
 	quoted_post?: BaseInterface;
-	direct_replies?: CommentInterface[];
-	quoted?: PostInterface[];
 }
 
 export interface CommentInterface extends BaseInterface {
 	post_type: 'Comment';
-	root_post: PopulatedDoc<PostInterface>;
-	parent_post: {
-		post_id: PopulatedDoc<BaseInterface>;
-		doc_model: 'Post' | 'Comment';
-	};
+	root_post?: PostInterface | null;
+	parent_post: PostInterface | CommentInterface;
 }
 
 export interface LikeInterface {
 	timestamp: Date;
-	user: PopulatedDoc<UserInterface>;
-	post: PopulatedDoc<PostInterface>;
-	doc_model: 'Post' | 'Comment';
+	user: Types.ObjectId;
+	post: Types.ObjectId;
 }

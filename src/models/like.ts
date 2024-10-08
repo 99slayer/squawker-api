@@ -12,17 +12,9 @@ const LikeSchema = new Schema<LikeInterface>(
 		},
 		post: {
 			type: Schema.Types.ObjectId,
-			refPath: 'doc_model',
+			ref: 'Base',
 			required: true
-		},
-		doc_model: {
-			type: String,
-			enum: ['Post', 'Comment'],
-			required: true
-		},
-	},
-	{
-		id: false
+		}
 	}
 );
 
