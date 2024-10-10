@@ -8,9 +8,11 @@ import {
 	doc,
 	UserInterface,
 	followData,
-	LocalUser
+	LocalUser,
+	GuestInterface
 } from '../types';
 import User from '../models/user';
+import Guest from '../models/guest';
 import Post from '../models/post';
 import Comment from '../models/comment';
 import { HydratedDocument } from 'mongoose';
@@ -285,6 +287,61 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 			});
 		}),
 ];
+
+export const createGuestUser: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next) => {
+		req.body.password = 'password';
+		bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
+			if (err) throw err;
+			const guestCount = await Guest.countDocuments({});
+			req.body.username = `guest-${guestCount + 1}`;
+
+			const user: HydratedDocument<GuestInterface> = new Guest({
+				username: req.body.username,
+				nickname: 'guest',
+				password: hashedPswd,
+				email: `guest${guestCount + 1}@tempmail.com`,
+				join_date: new Date,
+				expireAt: new Date
+			});
+
+			const users = await User
+				.aggregate([
+					{ $sample: { size: 10 } },
+					{ $match: { user_type: { $ne: 'Guest' } } },
+				]);
+
+			user.following = users;
+			await user.save();
+
+			// authenticates and serializes user
+			passport.authenticate(
+				'local',
+				function (err: unknown, user: LocalUser): res | next | void {
+					if (err) { return next(err); }
+					if (!user) {
+						return res.sendStatus(404);
+					}
+
+					req.login(user, (err) => {
+						if (err) {
+							return next(err);
+						}
+
+						const data: {
+							username: string,
+							nickname: string
+						} = {
+							username: user.username,
+							nickname: user.nickname
+						};
+
+						return res.send(data).status(200);
+					});
+				})(req, res, next);
+		});
+	}
+);
 
 export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(

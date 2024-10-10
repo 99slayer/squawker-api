@@ -21,6 +21,7 @@ const UserSchema = new Schema<UserInterface>(
 		followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 	},
 	{
+		discriminatorKey: 'user_type',
 		toJSON: { virtuals: true },
 		toObject: { virtuals: true },
 		id: false

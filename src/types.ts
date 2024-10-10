@@ -15,6 +15,7 @@ declare module 'express-serve-static-core' {
 			nickname: string;
 			email: string;
 			password: string;
+			user_type?: string;
 		}
 	}
 }
@@ -24,7 +25,7 @@ export interface LocalUser {
 	username: string;
 	nickname: string;
 	email: string;
-	password: string
+	password: string;
 }
 
 export interface followData {
@@ -54,6 +55,11 @@ export interface UserInterface {
 	post_count?: number;
 	comment_count?: number;
 	like_count?: number;
+	user_type?: string;
+}
+
+export interface GuestInterface extends UserInterface {
+	expireAt: Date;
 }
 
 type BaseData = {

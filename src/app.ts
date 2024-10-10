@@ -72,7 +72,11 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use((req: req, res: res, next: next): res | next | void => {
-	if (req.url === '/login' || req.url === '/signup') return next();
+	if (
+		req.url === '/login' ||
+		req.url === '/signup' ||
+		req.url === '/signup-guest'
+	) return next();
 	if (!req.isAuthenticated()) throw new Error('401');
 
 	const userData: Express.User = {
@@ -81,6 +85,7 @@ app.use((req: req, res: res, next: next): res | next | void => {
 		nickname: req.user.nickname,
 		email: req.user.email,
 		password: req.user.password,
+		guest: req.user.user_type === 'Guest' ? true : false
 	};
 
 	res.locals.user = userData;

@@ -11,7 +11,7 @@ export function initialize(passport: passport.PassportStatic) {
 		password: string,
 		done: dcb
 	): Promise<void> => {
-		const user: PopulatedDoc<UserInterface> | null = await User.findOne({ username: username });
+		const user: UserInterface | null = await User.findOne({ username: username });
 
 		if (!user) {
 			return done(null, false);
