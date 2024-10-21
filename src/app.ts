@@ -85,11 +85,25 @@ app.use((req: req, res: res, next: next): res | next | void => {
 		nickname: req.user.nickname,
 		email: req.user.email,
 		password: req.user.password,
+		pfp: req.user.pfp,
 		guest: req.user.user_type === 'Guest' ? true : false
 	};
 
 	res.locals.user = userData;
 	next();
+});
+
+// Validates image urls.
+app.use((req: req, res: res, next: next): res | next | void => {
+	if (req.body.image || req.body.pfp || req.body.header) {
+		const imageUrl: string = req.body.image || req.body.pfp || req.body.header;
+
+		if (!process.env.IMG_URL) throw new Error('500');
+		if (imageUrl.startsWith(process.env.IMG_URL)) return next();
+		if (imageUrl === 'clear') return next();
+
+		throw new Error('404');
+	} else next();
 });
 
 app.use('/', apiRouter);

@@ -1,5 +1,12 @@
 import asyncHandler from 'express-async-handler';
-import { body, validationResult, ValidationChain, Result, ValidationError } from 'express-validator';
+import {
+	body,
+	validationResult,
+	ValidationChain,
+	Result,
+	ValidationError,
+	oneOf
+} from 'express-validator';
 import bcrypt from 'bcryptjs';
 import {
 	req,
@@ -330,10 +337,12 @@ export const createGuestUser: RequestHandler = asyncHandler(
 
 						const data: {
 							username: string,
-							nickname: string
+							nickname: string,
+							pfp: string
 						} = {
 							username: user.username,
-							nickname: user.nickname
+							nickname: user.nickname,
+							pfp: user.pfp
 						};
 
 						return res.send(data).status(200);
@@ -401,13 +410,38 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 		.trim()
 		.isLength({ max: 1000 })
 		.withMessage('Profile text exceeds character limit.'),
-	body('profile_header')
-		.if((value, { req }) => {
-			return req.body.profile_header;
-		})
-		.trim()
-		.isLength({ max: 100 })
-		.withMessage('Profile header url exceeds character limit.'),
+	oneOf([
+		body('header')
+			.if((value, { req }) => {
+				return req.body.header;
+			})
+			.isURL(),
+		body('header')
+			.if((value, { req }) => {
+				return req.body.header;
+			})
+			.custom((value, { req }) => {
+				if (value === 'clear') {
+					return true;
+				} else return false;
+			}),
+	]),
+	oneOf([
+		body('pfp')
+			.if((value, { req }) => {
+				return req.body.pfp;
+			})
+			.isURL(),
+		body('pfp')
+			.if((value, { req }) => {
+				return req.body.pfp;
+			})
+			.custom((value, { req }) => {
+				if (value === 'clear') {
+					return true;
+				} else return false;
+			}),
+	]),
 
 	asyncHandler(
 		async (req, res, next) => {
@@ -417,6 +451,8 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 				console.log(errors);
 				throw new Error('400');
 			}
+			if (req.body.pfp === 'clear') req.body.pfp = null;
+			if (req.body.header === 'clear') req.body.header = null;
 
 			const originalUser: UserInterface = await User
 				.findById(res.locals.user._id)
@@ -431,8 +467,8 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 						email: req.body.email ? req.body.email : originalUser.email,
 						nickname: req.body.nickname ? req.body.nickname : originalUser.nickname,
 						join_date: originalUser.join_date,
-						pfp: req.body.pfp ? req.body.pfp : originalUser.pfp,
-						profile_header: req.body.profile_header ? req.body.profile_header : originalUser.profile_header,
+						pfp: req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp,
+						profile_header: req.body.header || req.body.header === null ? req.body.header : originalUser.profile_header,
 						profile_text: req.body.profile_text ? req.body.profile_text : originalUser.profile_text,
 						following: originalUser.following,
 						followers: originalUser.followers
@@ -443,7 +479,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			if (
 				req.body.username ||
 				req.body.nickname ||
-				req.body.pfp
+				(req.body.pfp || req.body.pfp === null)
 			) {
 				await Post.bulkWrite([
 					// update posts
@@ -454,7 +490,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 								$set: {
 									'post_data.user.username': req.body.username ? req.body.username : originalUser.username,
 									'post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post_data.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+									'post_data.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -466,7 +502,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 								$set: {
 									'post.user.username': req.body.username ? req.body.username : originalUser.username,
 									'post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+									'post.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -479,7 +515,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 								$set: {
 									'quoted_post.post_data.user.username': req.body.username ? req.body.username : originalUser.username,
 									'quoted_post.post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'quoted_post.post_data.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+									'quoted_post.post_data.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -491,7 +527,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 								$set: {
 									'quoted_post.post.user.username': req.body.username ? req.body.username : originalUser.username,
 									'quoted_post.post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'quoted_post.post.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+									'quoted_post.post.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -509,7 +545,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 								$set: {
 									'post_data.user.username': req.body.username ? req.body.username : originalUser.username,
 									'post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post_data.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+									'post_data.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -521,7 +557,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 								$set: {
 									'post.user.username': req.body.username ? req.body.username : originalUser.username,
 									'post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post.user.pfp': req.body.pfp ? req.body.pfp : originalUser.pfp
+									'post.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -531,14 +567,16 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 				});
 			}
 
-			const data: {
-				username: string,
-				nickname: string
-			} = {
-				username: newUser.username,
-				nickname: newUser.nickname
+			const normalizeResData = () => {
+				return {
+					...(req.body.username && { username: newUser.username }),
+					...(req.body.nickname && { nickname: newUser.nickname }),
+					...((req.body.pfp || req.body.pfp === null) && { pfp: newUser.pfp }),
+					...((req.body.header || req.body.header === null) && { header: newUser.profile_header })
+				};
 			};
 
+			const data = normalizeResData();
 			res.send(data).status(200);
 		}
 	)

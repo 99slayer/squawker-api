@@ -15,6 +15,7 @@ declare module 'express-serve-static-core' {
 			nickname: string;
 			email: string;
 			password: string;
+			pfp: string;
 			user_type?: string;
 		}
 	}
@@ -26,6 +27,7 @@ export interface LocalUser {
 	nickname: string;
 	email: string;
 	password: string;
+	pfp: string;
 }
 
 export interface followData {
@@ -76,7 +78,7 @@ type BaseData = {
 
 type BasePost = {
 	timestamp: string;
-	text: string;
+	text?: string;
 	post_image?: string;
 	user: {
 		id: Types.ObjectId;

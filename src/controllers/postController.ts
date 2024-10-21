@@ -95,16 +95,24 @@ export const getPost: RequestHandler = asyncHandler(
 
 export const createPost: (RequestHandler | ValidationChain)[] = [
 	body('text')
+		.if((value, { req }) => {
+			return req.body.text;
+		})
 		.trim()
-		.notEmpty()
 		.isLength({ min: 1, max: 300 })
 		.withMessage('should be 300 chars or under.'),
+	body('image')
+		.if((value, { req }) => {
+			return req.body.image;
+		})
+		.isURL(),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
 			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) throw new Error('400');
+			if (!req.body.text && !req.body.image) throw new Error('400');
 
 			const post: HydratedDocument<PostInterface> = new Post({
 				post_data: {
@@ -119,6 +127,7 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 				post: {
 					timestamp: new Date,
 					text: req.body.text,
+					post_image: req.body.image ?? null,
 					user: {
 						id: res.locals.user._id,
 						username: res.locals.user.username,
@@ -181,6 +190,7 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 
 			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('401');
 			if (post.post_data.repost) throw new Error('401');
+			if (!post.post.text) throw new Error('400');
 			next();
 		}),
 

@@ -1,4 +1,3 @@
-import asyncHandler from 'express-async-handler';
 import passport from 'passport';
 import { req, res, next } from '../types';
 
@@ -16,7 +15,8 @@ export const login = (req: req, res: res, next: next): res | next | void => {
 
 			const data: object = {
 				username: user.username,
-				nickname: user.nickname
+				nickname: user.nickname,
+				pfp: user.pfp
 			};
 
 			return res.send(data).status(200);

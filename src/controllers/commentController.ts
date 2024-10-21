@@ -98,10 +98,17 @@ export const getCommentGroup: RequestHandler = asyncHandler(
 
 export const createComment: (RequestHandler | ValidationChain)[] = [
 	body('text')
+		.if((value, { req }) => {
+			return req.body.text;
+		})
 		.trim()
-		.notEmpty()
 		.isLength({ min: 1, max: 300 })
 		.withMessage('should be 300 chars or under.'),
+	body('image')
+		.if((value, { req }) => {
+			return req.body.image;
+		})
+		.isURL(),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
@@ -111,6 +118,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 				console.log(errors);
 				throw new Error('400');
 			}
+			if (!req.body.text && !req.body.image) throw new Error('400');
 
 			const parent: BaseInterface = await Base
 				.findById(req.params.parentId)
@@ -129,6 +137,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 				post: {
 					timestamp: new Date,
 					text: req.body.text,
+					post_image: req.body.image ?? null,
 					user: {
 						id: res.locals.user._id,
 						username: res.locals.user.username,
@@ -186,6 +195,7 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 				.orFail(new Error('404'));
 
 			if (!res.locals.user._id.equals(comment.post_data?.user.id)) throw new Error('401');
+			if (!comment.post.text) throw new Error('400');
 			next();
 		}),
 
