@@ -1,5 +1,8 @@
 import passport from 'passport';
-import { req, res, next } from '../types';
+import { req, res, next, UserInterface } from '../types';
+import asyncHandler from 'express-async-handler';
+import { RequestHandler } from 'express';
+import User from '../models/user';
 
 export const login = (req: req, res: res, next: next): res | next | void => {
 	passport.authenticate('local', function (err: unknown, user: any): res | next | void {
@@ -30,3 +33,14 @@ export const logout = (req: req, res: res, next: next) => {
 		return res.sendStatus(200);
 	});
 };
+
+export const verify: RequestHandler = asyncHandler(
+	async (req: req, res: res, next: next): Promise<void> => {
+		const user: UserInterface = await User
+			.findOne({ username: req.params.username })
+			.orFail(new Error('404'));
+
+		const isUser = Boolean(String(res.locals.user._id) === String(user._id));
+
+		res.send(isUser).status(200);
+	});

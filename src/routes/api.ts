@@ -22,6 +22,11 @@ router.delete(
 	auth.logout,
 	err
 );
+router.get(
+	'/verify/:username',
+	auth.verify,
+	err
+);
 
 // USER ROUTES
 router.get(
