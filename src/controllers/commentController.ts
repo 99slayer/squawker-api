@@ -39,7 +39,7 @@ export const getUserComments: RequestHandler = asyncHandler(
 			.sort({ 'post_data.timestamp': -1 });
 
 		await checkCommentLikes(comments, res.locals.user._id);
-		res.send(comments).status(200);
+		res.status(200).send(comments);
 	});
 
 export const getPostReplies: RequestHandler = asyncHandler(
@@ -59,7 +59,7 @@ export const getPostReplies: RequestHandler = asyncHandler(
 			.populate('direct_comment_count repost_count like_count');
 
 		await checkCommentLikes(comments, res.locals.user._id);
-		res.send(comments).status(200);
+		res.status(200).send(comments);
 	}
 );
 
@@ -80,7 +80,7 @@ export const getCommentReplies: RequestHandler = asyncHandler(
 			.populate('direct_comment_count repost_count like_count');
 
 		await checkCommentLikes(comments, res.locals.user._id);
-		res.send(comments).status(200);
+		res.status(200).send(comments);
 	}
 );
 
@@ -92,7 +92,8 @@ export const getCommentGroup: RequestHandler = asyncHandler(
 			.orFail(new Error('Query failed.'));
 
 		await checkCommentLikes(comment, res.locals.user._id);
-		res.send(comment).status(200);
+		// res.send(comment).status(200);
+		res.status(200).send(comment);
 	}
 );
 
@@ -155,7 +156,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 			if (req.body.image) comment.post!.post_image = req.body.image;
 
 			await comment.save();
-			res.send({ _id: comment._id }).status(200);
+			res.status(200).send({ _id: comment._id });
 		})
 ];
 
@@ -184,7 +185,7 @@ export const createRepost: RequestHandler | ValidationChain =
 			});
 
 			await repost.save();
-			res.send({ _id: repost._id }).status(201);
+			res.status(201).send({ _id: repost._id });
 		}
 	);
 

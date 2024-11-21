@@ -49,7 +49,7 @@ export const getUser: RequestHandler = asyncHandler(
 			user.isFollowing = true;
 		}
 
-		res.send(user).status(200);
+		res.status(200).send(user);
 	}
 );
 
@@ -79,7 +79,7 @@ export const getUsers: RequestHandler = asyncHandler(
 
 			userList.push(user);
 		}
-		res.send(userList).status(200);
+		res.status(200).send(userList);
 	}
 );
 
@@ -114,7 +114,7 @@ export const getFollowers: RequestHandler = asyncHandler(
 			return data;
 		});
 
-		res.send(followerData).status(200);
+		res.status(200).send(followerData);
 	}
 );
 
@@ -149,7 +149,7 @@ export const getFollowing: RequestHandler = asyncHandler(
 			return data;
 		});
 
-		res.send(followingData).status(200);
+		res.status(200).send(followingData);
 	}
 );
 
@@ -293,7 +293,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 								nickname: user.nickname
 							};
 
-							return res.send(data).status(200);
+							return res.status(200).send(data);
 						});
 					})(req, res, next);
 			});
@@ -349,7 +349,7 @@ export const createGuestUser: RequestHandler = asyncHandler(
 							pfp: user.pfp
 						};
 
-						return res.send(data).status(200);
+						return res.status(200).send(data);
 					});
 				})(req, res, next);
 		});
@@ -582,7 +582,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			};
 
 			const data = normalizeResData();
-			res.send(data).status(200);
+			res.status(200).send(data);
 		}
 	)
 ];

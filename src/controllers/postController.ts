@@ -61,7 +61,7 @@ export const home: RequestHandler = asyncHandler(
 			.sort({ 'post_data.timestamp': -1 });
 
 		await checkPostLikes(posts, res.locals.user._id);
-		res.send(posts).status(200);
+		res.status(200).send(posts);
 	});
 
 export const getUserPosts: RequestHandler = asyncHandler(
@@ -79,7 +79,7 @@ export const getUserPosts: RequestHandler = asyncHandler(
 			.sort({ 'post_data.timestamp': -1 });
 
 		await checkPostLikes(posts, res.locals.user._id);
-		res.send(posts).status(200);
+		res.status(200).send(posts);
 	});
 
 export const getPost: RequestHandler = asyncHandler(
@@ -90,7 +90,7 @@ export const getPost: RequestHandler = asyncHandler(
 			.orFail(new Error('Query failed.'));
 
 		await checkPostLikes(post, res.locals.user._id);
-		res.send(post).status(200);
+		res.status(200).send(post);
 	});
 
 export const createPost: (RequestHandler | ValidationChain)[] = [
@@ -152,7 +152,7 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 			if (req.body.image) post.post.post_image = req.body.image;
 
 			await post.save();
-			res.send({ _id: post._id }).status(201);
+			res.status(201).send({ _id: post._id });
 		}),
 ];
 
@@ -180,7 +180,7 @@ export const createRepost: RequestHandler | ValidationChain =
 			});
 
 			await repost.save();
-			res.send({ _id: repost._id }).status(201);
+			res.status(201).send({ _id: repost._id });
 		}
 	);
 

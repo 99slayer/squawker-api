@@ -27,7 +27,7 @@ export const login = (req: req, res: res, next: next): res | next | void => {
 				pfp: user.pfp
 			};
 
-			return res.send(data).status(200);
+			return res.status(200).send(data);
 		});
 	})(req, res, next);
 };
@@ -47,5 +47,5 @@ export const verify: RequestHandler = asyncHandler(
 
 		const isUser = Boolean(String(res.locals.user._id) === String(user._id));
 
-		res.send(isUser).status(200);
+		res.status(200).send(isUser);
 	});
