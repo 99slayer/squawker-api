@@ -309,7 +309,6 @@ export const createGuestUser: RequestHandler = asyncHandler(
 				password: hashedPswd,
 				email: `guest${guestCount + 1}@tempmail.com`,
 				join_date: new Date,
-				expireAt: new Date
 			});
 
 			const users = await User
