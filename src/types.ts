@@ -31,6 +31,7 @@ export interface LocalUser {
 }
 
 export interface followData {
+	_id: Types.ObjectId;
 	username: string;
 	nickname: string;
 	pfp?: string;

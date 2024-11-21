@@ -14,7 +14,8 @@ export function initialize(passport: passport.PassportStatic) {
 		const user: UserInterface | null = await User.findOne({ username: username });
 
 		if (!user) {
-			return done(null, false);
+			const err = new Error('Query failed.');
+			return done(err, false);
 		}
 
 		try {
@@ -22,7 +23,8 @@ export function initialize(passport: passport.PassportStatic) {
 			if (await bcrypt.compare(password, user.password)) {
 				return done(null, user);
 			} else {
-				return done(null, false);
+				const err = new Error('Invalid user input.');
+				return done(err, false);
 			}
 		} catch (error) {
 			return done(error);

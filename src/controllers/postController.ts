@@ -20,21 +20,21 @@ import Post from '../models/post';
 import Comment from '../models/comment';
 import Like from '../models/like';
 import { HydratedDocument, Types } from 'mongoose';
-import { checkPostLikes } from '../util';
+import { checkPostLikes, getValidationErrors } from '../util';
 
 export const home: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
 		const postCount: number = Number(req.query.postCount);
 		const batchSize: number = 10;
 
-		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('400');
+		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('Invalid request query.');
 
 		const following: Types.ObjectId[] = await User
 			.findById(res.locals.user._id)
 			.select('following')
 			.transform(doc => {
 				return doc?.following;
-			}).orFail(new Error('404'));
+			}).orFail(new Error('Query failed.'));
 
 		const posts: BaseInterface[] = await Base
 			.find({
@@ -69,7 +69,7 @@ export const getUserPosts: RequestHandler = asyncHandler(
 		const postCount: number = Number(req.query.postCount);
 		const batchSize: number = 10;
 
-		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('400');
+		if ((!postCount && postCount !== 0) || Number.isNaN(postCount)) throw new Error('Invalid request query.');
 
 		const posts: PostInterface[] = await Post
 			.find({ 'post_data.user.username': req.params.username })
@@ -87,7 +87,7 @@ export const getPost: RequestHandler = asyncHandler(
 		const post: PostInterface = await Post
 			.findById(req.params.postId)
 			.populate('direct_comment_count repost_count like_count')
-			.orFail(new Error('404'));
+			.orFail(new Error('Query failed.'));
 
 		await checkPostLikes(post, res.locals.user._id);
 		res.send(post).status(200);
@@ -111,8 +111,12 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const errors: Result<ValidationError> = validationResult(req);
 
-			if (!errors.isEmpty()) throw new Error('400');
-			if (!req.body.text && !req.body.image) throw new Error('400');
+			if (!errors.isEmpty()) {
+				const errArr: Record<string, string[]> = getValidationErrors(errors);
+				res.locals.validationErrors = errArr;
+				throw new Error('Invalid user input.');
+			}
+			if (!req.body.text && !req.body.image) throw new Error('Invalid user input.');
 
 			const post: HydratedDocument<PostInterface> = new Post({
 				post_data: {
@@ -142,10 +146,9 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 			if (req.params.quotedPostId) {
 				const quotedPost: BaseInterface = await Base
 					.findById(req.params.quotedPostId)
-					.orFail(new Error('404'));
+					.orFail(new Error('Query failed.'));
 				post.quoted_post = quotedPost;
 			}
-
 			if (req.body.image) post.post.post_image = req.body.image;
 
 			await post.save();
@@ -158,7 +161,7 @@ export const createRepost: RequestHandler | ValidationChain =
 		async (req: req, res: res, next: next) => {
 			const post: PostInterface = await Post
 				.findById(req.params.postId)
-				.orFail(new Error('404'));
+				.orFail(new Error('Query failed.'));
 
 			const repost: HydratedDocument<PostInterface> = new Post({
 				post_data: {
@@ -186,11 +189,10 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 		async (req: req, res: res, next: next) => {
 			const post: PostInterface = await Post
 				.findById(req.params.postId)
-				.orFail(new Error('404'));
+				.orFail(new Error('Query failed.'));
 
-			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('401');
-			if (post.post_data.repost) throw new Error('401');
-			if (!post.post.text) throw new Error('400');
+			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('Unauthorized');
+			if (post.post_data.repost || !post.post.text) throw new Error('Unacceptable request.');
 			next();
 		}),
 
@@ -205,8 +207,9 @@ export const updatePost: (RequestHandler | ValidationChain)[] = [
 			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) {
-				console.log(errors);
-				throw new Error('400');
+				const errArr: Record<string, string[]> = getValidationErrors(errors);
+				res.locals.validationErrors = errArr;
+				throw new Error('Invalid user input.');
 			}
 
 			await Post.bulkWrite([
@@ -242,9 +245,9 @@ export const deletePost: RequestHandler[] = [
 		async (req, res, next) => {
 			const post: PostInterface = await Post
 				.findById(req.params.postId)
-				.orFail(new Error('404'));
+				.orFail(new Error('Query failed.'));
 
-			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('401');
+			if (!res.locals.user._id.equals(post.post_data?.user.id)) throw new Error('Unauthorized');
 			next();
 		}),
 

@@ -29,22 +29,13 @@ export const createLike: RequestHandler = asyncHandler(
 		res.sendStatus(200);
 	});
 
-export const deleteLike: RequestHandler[] = [
-	asyncHandler(
-		async (req, res, next) => {
-			const like: LikeInterface | null = await Like
-				.findOne({ user: res.locals.user._id, post: req.params.postId });
-
-			if (!like) throw new Error('401');
-			next();
-		}),
-
+export const deleteLike: RequestHandler =
 	asyncHandler(
 		async (req: req, res: res, next: next) => {
 			await Like
 				.findOneAndDelete({ user: res.locals.user._id, post: req.params.postId })
-				.orFail(new Error('404'));
+				.orFail(new Error('Query failed.'));
 
 			res.sendStatus(200);
-		})
-];
+		}
+	);

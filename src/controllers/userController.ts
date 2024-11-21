@@ -25,6 +25,7 @@ import Comment from '../models/comment';
 import { HydratedDocument } from 'mongoose';
 import { RequestHandler } from 'express';
 import passport from 'passport';
+import { getValidationErrors } from '../util';
 
 const innerWhitespace = (string: string) => {
 	if (/\s/.test(string)) {
@@ -40,7 +41,7 @@ export const getUser: RequestHandler = asyncHandler(
 			.findOne({ username: req.params.username })
 			.select('-password -email')
 			.populate('post_count comment_count like_count')
-			.orFail(new Error('404'));
+			.orFail(new Error('Query failed.'));
 
 		let user = userDoc;
 		if (user.followers.includes(res.locals.user._id)) {
@@ -57,15 +58,14 @@ export const getUsers: RequestHandler = asyncHandler(
 		const userCount: number = Number(req.query.userCount);
 		const batchSize: number = 10;
 
-		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('400');
+		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('Invalid request query.');
 
 		const users: doc<UserInterface>[] = await User
 			.find({ username: { $ne: res.locals.user.username } })
 			.skip(userCount)
 			.limit(batchSize)
 			.select('-password -email')
-			.sort({ username: 1 })
-			.orFail(new Error('404'));
+			.sort({ username: 1 });
 
 		const userList: doc<UserInterface>[] = [];
 		for (let i = 0; i < users.length; i++) {
@@ -79,7 +79,6 @@ export const getUsers: RequestHandler = asyncHandler(
 
 			userList.push(user);
 		}
-
 		res.send(userList).status(200);
 	}
 );
@@ -89,27 +88,29 @@ export const getFollowers: RequestHandler = asyncHandler(
 		const userCount: number = Number(req.query.userCount);
 		const batchSize: number = 20;
 
-		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('400');
-
-		const user: UserInterface = await User
-			.findOne({ username: req.params.username })
-			.orFail(new Error('404'));
+		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('Invalid request query.');
 
 		const followers: UserInterface[] = await User
-			.find({ following: user._id })
-			.skip(userCount)
-			.limit(batchSize)
-			.orFail(new Error('404'));
+			.findOne({ username: req.params.username })
+			.populate<{ followers: UserInterface[] }>({
+				path: 'followers',
+				options: {
+					limit: batchSize,
+					skip: userCount
+				}
+			})
+			.transform(doc => { return doc?.followers; })
+			.orFail(new Error('Query failed.'));
 
 		const followerData: followData[] = followers.map(doc => {
 			const data: followData = {
+				_id: doc._id,
 				username: doc.username,
 				nickname: doc.nickname,
 				pfp: doc.pfp,
 				profileText: doc.profile_text,
 				isFollowing: doc.followers.includes(res.locals.user._id)
 			};
-
 			return data;
 		});
 
@@ -122,27 +123,29 @@ export const getFollowing: RequestHandler = asyncHandler(
 		const userCount: number = Number(req.query.userCount);
 		const batchSize: number = 4;
 
-		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('400');
-
-		const user: UserInterface = await User
-			.findOne({ username: req.params.username })
-			.orFail(new Error('404'));
+		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('Invalid request query.');
 
 		const following: UserInterface[] = await User
-			.find({ followers: user._id })
-			.skip(userCount)
-			.limit(batchSize)
-			.orFail(new Error('404'));
+			.findOne({ username: req.params.username })
+			.populate<{ following: UserInterface[] }>({
+				path: 'following',
+				options: {
+					limit: batchSize,
+					skip: userCount
+				}
+			})
+			.transform(doc => { return doc?.following; })
+			.orFail(new Error('Query failed.'));
 
 		const followingData: followData[] = following.map(doc => {
 			const data: followData = {
+				_id: doc._id,
 				username: doc.username,
 				nickname: doc.nickname,
 				pfp: doc.pfp,
 				profileText: doc.profile_text,
 				isFollowing: doc.followers.includes(res.locals.user._id)
 			};
-
 			return data;
 		});
 
@@ -152,10 +155,11 @@ export const getFollowing: RequestHandler = asyncHandler(
 
 export const follow: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
-		if (req.params.username === res.locals.user.username) throw new Error('404');
+		if (req.params.username === res.locals.user.username) throw new Error('Unacceptable request.');
+
 		const user: doc<UserInterface> = await User
 			.findOne({ username: req.params.username })
-			.orFail(new Error('404'));
+			.orFail(new Error('Query failed.'));
 
 		if (user?.followers.includes(res.locals.user._id)) {
 			res.sendStatus(200);
@@ -250,8 +254,9 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) {
-				console.log(errors);
-				throw new Error('400');
+				const errArr: Record<string, string[]> = getValidationErrors(errors);
+				res.locals.validationErrors = errArr;
+				throw new Error('Invalid user input.');
 			}
 
 			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {
@@ -354,7 +359,7 @@ export const createGuestUser: RequestHandler = asyncHandler(
 export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			if (res.locals.user.username !== req.params.username) throw new Error('401');
+			if (res.locals.user.username !== req.params.username) throw new Error('Unauthorized');
 			next();
 		}
 	),
@@ -447,15 +452,16 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) {
-				console.log(errors);
-				throw new Error('400');
+				const errArr: Record<string, string[]> = getValidationErrors(errors);
+				res.locals.validationErrors = errArr;
+				throw new Error('Invalid user input.');
 			}
 			if (req.body.pfp === 'clear') req.body.pfp = null;
 			if (req.body.header === 'clear') req.body.header = null;
 
 			const originalUser: UserInterface = await User
 				.findById(res.locals.user._id)
-				.orFail(new Error('404'));
+				.orFail(new Error('Query failed.'));
 
 			const newUser: doc<UserInterface> = await User
 				.findOneAndUpdate(
@@ -473,7 +479,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 						followers: originalUser.followers
 					},
 					{ new: true },
-				).orFail(new Error('404'));
+				).orFail(new Error('Query failed.'));
 
 			if (
 				req.body.username ||
@@ -584,7 +590,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 export const updateUserSecurity: (RequestHandler | ValidationChain)[] = [
 	asyncHandler(
 		async (req, res, next) => {
-			if (res.locals.user.username !== req.params.username) throw new Error('401');
+			if (res.locals.user.username !== req.params.username) throw new Error('Unauthorized');
 			next();
 		}
 	),
@@ -625,8 +631,9 @@ export const updateUserSecurity: (RequestHandler | ValidationChain)[] = [
 			const errors: Result<ValidationError> = validationResult(req);
 
 			if (!errors.isEmpty()) {
-				console.log(errors);
-				throw new Error('400');
+				const errArr: Record<string, string[]> = getValidationErrors(errors);
+				res.locals.validationErrors = errArr;
+				throw new Error('Invalid user input.');
 			}
 
 			bcrypt.hash(req.body.password, 10, async (err, hashedPswd) => {

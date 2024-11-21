@@ -1,3 +1,4 @@
+import { Result, ValidationError } from 'express-validator';
 import Like from './models/like';
 import { BaseInterface, CommentInterface, LikeInterface, PostInterface } from './types';
 
@@ -80,4 +81,18 @@ async function addCommentLikes(
 			comment.root_post!.liked = true;
 		} else comment.root_post!.liked = false;
 	}
+}
+
+export function getValidationErrors(arr: Result<ValidationError>): Record<string, string[]> {
+	const errors: Record<string, string[]> = {};
+	arr.array().map((err) => {
+		if (err.type === 'field') {
+			errors[`${err.path}Errors`] =
+				errors[`${err.path}Errors`] ?
+					[...errors[`${err.path}Errors`], err.msg] :
+					[err.msg];
+		}
+	});
+
+	return errors;
 }
