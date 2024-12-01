@@ -365,6 +365,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			next();
 		}
 	),
+
 	body('username')
 		.if((value, { req }) => {
 			return req.body.username;
@@ -486,7 +487,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			if (
 				req.body.username ||
 				req.body.nickname ||
-				(req.body.pfp || req.body.pfp === null)
+				req.body.pfp !== undefined
 			) {
 				await Post.bulkWrite([
 					// update posts
@@ -495,9 +496,9 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 							filter: { 'post_data.user.id': res.locals.user._id },
 							update: {
 								$set: {
-									'post_data.user.username': req.body.username ? req.body.username : originalUser.username,
-									'post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post_data.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
+									'post_data.user.username': req.body.username ?? originalUser.username,
+									'post_data.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'post_data.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -507,9 +508,9 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 							filter: { 'post.user.id': res.locals.user._id },
 							update: {
 								$set: {
-									'post.user.username': req.body.username ? req.body.username : originalUser.username,
-									'post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
+									'post.user.username': req.body.username ?? originalUser.username,
+									'post.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'post.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -520,9 +521,9 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 							filter: { 'quoted_post.post_data.user.id': res.locals.user._id },
 							update: {
 								$set: {
-									'quoted_post.post_data.user.username': req.body.username ? req.body.username : originalUser.username,
-									'quoted_post.post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'quoted_post.post_data.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
+									'quoted_post.post_data.user.username': req.body.username ?? originalUser.username,
+									'quoted_post.post_data.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'quoted_post.post_data.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -532,9 +533,9 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 							filter: { 'quoted_post.post.user.id': res.locals.user._id },
 							update: {
 								$set: {
-									'quoted_post.post.user.username': req.body.username ? req.body.username : originalUser.username,
-									'quoted_post.post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'quoted_post.post.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
+									'quoted_post.post.user.username': req.body.username ?? originalUser.username,
+									'quoted_post.post.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'quoted_post.post.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
@@ -550,9 +551,9 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 							filter: { 'post_data.user.id': res.locals.user._id },
 							update: {
 								$set: {
-									'post_data.user.username': req.body.username ? req.body.username : originalUser.username,
-									'post_data.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post_data.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
+									'post_data.user.username': req.body.username ?? originalUser.username,
+									'post_data.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'post_data.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp
 								}
 							},
 						}
