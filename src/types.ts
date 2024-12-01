@@ -110,7 +110,7 @@ export interface BaseInterface {
 
 export interface PostInterface extends BaseInterface {
 	post_type: 'Post';
-	quoted_post?: BaseInterface;
+	quoted_post?: PostInterface | CommentInterface;
 }
 
 export interface CommentInterface extends BaseInterface {

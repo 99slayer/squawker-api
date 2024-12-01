@@ -16,13 +16,15 @@ import {
 	UserInterface,
 	followData,
 	LocalUser,
-	GuestInterface
+	GuestInterface,
+	PostInterface,
+	CommentInterface
 } from '../types';
 import User from '../models/user';
 import Guest from '../models/guest';
 import Post from '../models/post';
 import Comment from '../models/comment';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 import { RequestHandler } from 'express';
 import passport from 'passport';
 import { getValidationErrors } from '../util';
@@ -560,16 +562,117 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 							filter: { 'post.user.id': res.locals.user._id },
 							update: {
 								$set: {
-									'post.user.username': req.body.username ? req.body.username : originalUser.username,
-									'post.user.nickname': req.body.nickname ? req.body.nickname : originalUser.nickname,
-									'post.user.pfp': req.body.pfp || req.body.pfp === null ? req.body.pfp : originalUser.pfp
+									'post.user.username': req.body.username ?? originalUser.username,
+									'post.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'post.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp,
 								}
 							},
 						}
 					},
+					{
+						updateMany: {
+							filter: { 'root_post.post.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'root_post.post.user.username': req.body.username ?? originalUser.username,
+									'root_post.post.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'root_post.post.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp,
+								},
+							},
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'root_post.post_data.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'root_post.post_data.user.username': req.body.username ?? originalUser.username,
+									'root_post.post_data.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'root_post.post_data.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp,
+								},
+							},
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'parent_post.post.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'parent_post.post.user.username': req.body.username ?? originalUser.username,
+									'parent_post.post.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'parent_post.post.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp,
+								}
+							},
+						}
+					},
+					{
+						updateMany: {
+							filter: { 'parent_post.post_data.user.id': res.locals.user._id },
+							update: {
+								$set: {
+									'parent_post.post_data.user.username': req.body.username ?? originalUser.username,
+									'parent_post.post_data.user.nickname': req.body.nickname ?? originalUser.nickname,
+									'parent_post.post_data.user.pfp': req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp,
+								}
+							},
+						}
+					}
 				]).catch((err) => {
 					throw err;
 				});
+
+				// update comment root/parent quote posts
+				const rqp: doc<CommentInterface>[] = await Comment
+					.find({ 'root_post.quoted_post': { $ne: null } });
+				const pqp: doc<CommentInterface>[] = await Comment
+					.find({ 'parent_post.quoted_post': { $ne: null } });
+
+				const userRQP: doc<CommentInterface>[] = rqp.filter((doc) => {
+					const id: Types.ObjectId = doc?.get('root_post.quoted_post.post.user.id');
+					return id.toString() === res.locals.user._id.toString();
+				});
+				const userPQP: doc<CommentInterface>[] = pqp.filter((doc) => {
+					const id: Types.ObjectId = doc?.get('parent_post.quoted_post.post.user.id');
+					return id.toString() === res.locals.user._id.toString();
+				});
+
+				setQP(userRQP, 'root');
+				setQP(userPQP, 'parent');
+			}
+
+			async function setQP(
+				arr: doc<CommentInterface>[],
+				type: 'root' | 'parent',
+			): Promise<void> {
+				for (let i = 0; i < arr.length; i++) {
+					if (arr.length === 0) break;
+
+					const post: doc<CommentInterface> = arr[i];
+					const qp: PostInterface | CommentInterface = post!.get(`${type}_post.quoted_post`);
+
+					post!.set(
+						`${type}_post.quoted_post`,
+						{
+							post_data: qp.post_data,
+							post: {
+								user: {
+									id: qp.post.user.id,
+									username: req.body.username ?? originalUser.username,
+									nickname: req.body.nickname ?? originalUser.nickname,
+									pfp: req.body.pfp !== undefined ? req.body.pfp : originalUser.pfp,
+								},
+								timestamp: qp.post.timestamp,
+								text: qp.post.text,
+								post_image: qp.post.post_image,
+							},
+							liked: qp.liked,
+							_id: qp._id,
+							post_type: qp.post_type,
+						}
+					);
+
+					await post!.save();
+				}
 			}
 
 			const normalizeResData = () => {

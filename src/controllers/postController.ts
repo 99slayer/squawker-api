@@ -13,6 +13,7 @@ import {
 	next,
 	PostInterface,
 	BaseInterface,
+	CommentInterface,
 } from '../types';
 import User from '../models/user';
 import Base from '../models/base';
@@ -147,7 +148,12 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 				const quotedPost: BaseInterface = await Base
 					.findById(req.params.quotedPostId)
 					.orFail(new Error('Query failed.'));
-				post.quoted_post = quotedPost;
+
+				if (quotedPost.post_type === 'Post') {
+					post.quoted_post = quotedPost as PostInterface;
+				} else {
+					post.quoted_post = quotedPost as CommentInterface;
+				}
 			}
 			if (req.body.image) post.post.post_image = req.body.image;
 

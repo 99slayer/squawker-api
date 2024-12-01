@@ -6,7 +6,7 @@ const Schema = mongoose.Schema;
 
 const PostSchema = new Schema<PostInterface>({
 	quoted_post: {
-		type: BaseSchema || CommentSchema,
+		type: this || CommentSchema,
 		required: false
 	}
 });
