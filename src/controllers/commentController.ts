@@ -102,6 +102,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 		.if((value, { req }) => {
 			return req.body.text;
 		})
+		.isString()
 		.trim()
 		.isLength({ min: 1, max: 300 })
 		.withMessage('should be 300 chars or under.'),
@@ -202,6 +203,7 @@ export const updateComment: (RequestHandler | ValidationChain)[] = [
 		}),
 
 	body('text')
+		.isString()
 		.trim()
 		.notEmpty()
 		.isLength({ min: 1, max: 300 })

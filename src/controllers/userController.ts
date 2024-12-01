@@ -202,6 +202,7 @@ export const unfollow: RequestHandler = asyncHandler(
 
 export const createUser: (RequestHandler | ValidationChain)[] = [
 	body('username')
+		.isString()
 		.trim()
 		.custom(innerWhitespace)
 		.withMessage('Username should not have any spaces.')
@@ -218,6 +219,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 			return true;
 		}),
 	body('password')
+		.isString()
 		.trim()
 		.matches(/\d+/)
 		.withMessage('Password must contain at least one number.')
@@ -228,6 +230,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 		.isLength({ min: 8, max: 100 })
 		.withMessage('Password should be between 8-100 characters.'),
 	body('password-confirm')
+		.isString()
 		.trim()
 		.custom((value, { req }) => {
 			// Checks if passwords match.
@@ -236,6 +239,7 @@ export const createUser: (RequestHandler | ValidationChain)[] = [
 			return true;
 		}),
 	body('email')
+		.isString()
 		.trim()
 		.isEmail()
 		.withMessage('Invalid email.')
@@ -365,11 +369,11 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			next();
 		}
 	),
-
 	body('username')
 		.if((value, { req }) => {
 			return req.body.username;
 		})
+		.isString()
 		.trim()
 		.custom(innerWhitespace)
 		.withMessage('Username should not have any spaces.')
@@ -389,6 +393,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 		.if((value, { req }) => {
 			return req.body.email;
 		})
+		.isString()
 		.trim()
 		.isEmail()
 		.withMessage('Invalid email.')
@@ -407,6 +412,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 		.if((value, { req }) => {
 			return req.body.nickname;
 		})
+		.isString()
 		.trim()
 		.isLength({ min: 1, max: 50 })
 		.withMessage('Nickname must be between 1-50 characters long.'),
@@ -414,6 +420,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 		.if((value, { req }) => {
 			return req.body.profile_text;
 		})
+		.isString()
 		.trim()
 		.isLength({ max: 1000 })
 		.withMessage('Profile text exceeds character limit.'),
