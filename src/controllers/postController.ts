@@ -146,8 +146,33 @@ export const createPost: (RequestHandler | ValidationChain)[] = [
 			post.post_data.post_id = post._id;
 
 			if (req.params.quotedPostId) {
-				const quotedPost: BaseInterface = await Base
+				const quotedPost: {
+					_id: Types.ObjectId;
+					post_data: object;
+					post: object;
+					liked: boolean;
+					post_type: string;
+				} = await Base
 					.findById(req.params.quotedPostId)
+					.transform(doc => {
+						if (!doc) return;
+
+						const data: {
+							_id: Types.ObjectId;
+							post_data: object;
+							post: object;
+							liked: boolean;
+							post_type: string;
+						} = {
+							_id: doc._id,
+							post_data: doc.post_data,
+							post: doc.post,
+							liked: doc.liked,
+							post_type: doc.post_type
+						};
+
+						return data;
+					})
 					.orFail(new Error('Query failed.'));
 
 				if (quotedPost.post_type === 'Post') {

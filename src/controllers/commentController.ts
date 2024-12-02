@@ -11,7 +11,9 @@ import {
 	res,
 	next,
 	CommentInterface,
-	BaseInterface
+	BaseInterface,
+	doc,
+	PostInterface
 } from '../types';
 import Base from '../models/base';
 import Post from '../models/post';
@@ -123,9 +125,22 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 			}
 			if (!req.body.text && !req.body.image) throw new Error('Invalid user input.');
 
-			const parent: BaseInterface = await Base
+			const parent: doc<BaseInterface> = await Base
 				.findById(req.params.parentId)
 				.orFail(new Error('Query failed.'));
+
+			const parentObj: PostInterface | CommentInterface = parent.toObject();
+			const rootObj: PostInterface | CommentInterface = parent.toObject();
+
+			if (parentObj.parent_post) {
+				delete parentObj.parent_post;
+				delete parentObj.root_post;
+			}
+
+			if (rootObj.parent_post) {
+				delete rootObj.parent_post.parent_post;
+				delete rootObj.parent_post.root_post;
+			}
 
 			const comment: HydratedDocument<CommentInterface> = new Comment({
 				post_data: {
@@ -148,9 +163,8 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 						pfp: res.locals.user.pfp,
 					},
 				},
-
-				parent_post: parent,
-				root_post: parent.root_post || parent.parent_post || null
+				parent_post: parentObj,
+				root_post: rootObj.root_post || rootObj.parent_post || null
 			});
 
 			comment.post_data.post_id = comment._id;
