@@ -50,6 +50,7 @@ app.use(
 			'http://localhost:5173',
 			'http://127.0.0.1:5173'
 		],
+		methods: ['GET', 'POST', 'PUT', 'DELETE'],
 		credentials: true,
 	}),
 );
@@ -98,8 +99,8 @@ app.use((req: req, res: res, next: next): res | next | void => {
 	if (req.body.image || req.body.pfp || req.body.header) {
 		const imageUrl: string = req.body.image || req.body.pfp || req.body.header;
 
-		if (!process.env.IMG_URL) throw new Error('500');
-		if (imageUrl.startsWith(process.env.IMG_URL)) return next();
+		if (!process.env.SUPA_URL) throw new Error('500');
+		if (imageUrl.startsWith(process.env.SUPA_URL)) return next();
 		if (imageUrl === 'clear') return next();
 
 		throw new Error('404');
