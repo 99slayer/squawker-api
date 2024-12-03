@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "DEBUG=server nodemon ./src/app.ts",
+    "dev": "DEBUG=server,error nodemon ./src/app.ts",
     "dev-debug": "DEBUG=server nodemon --exec node -r ts-node/register --inspect ./src/app.ts",
     "start": "nodemon .dist/app.js",
     "build": "tsc"

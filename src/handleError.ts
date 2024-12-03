@@ -3,6 +3,8 @@ import {
 	res,
 	next
 } from './types';
+import Debug from 'debug';
+const debug = Debug('error');
 
 function handleError(
 	err: Error,
@@ -10,9 +12,9 @@ function handleError(
 	res: res,
 	next: next
 ) {
-	console.log('[ERROR MESSAGE] ' + err.message);
 	if (res.locals.validationErrors) {
-		console.log('[VALIDATION ERRORS]' + res.locals.validationErrors);
+		debug('[VALIDATION ERRORS]');
+		debug(res.locals.validationErrors);
 	}
 
 	let code;
