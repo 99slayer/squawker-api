@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "DEBUG=server,error nodemon ./src/app.ts",
     "dev-debug": "DEBUG=server nodemon --exec node -r ts-node/register --inspect ./src/app.ts",
-    "start": "nodemon .dist/app.js",
+    "start": "nodemon ./src/app.ts",
     "build": "tsc"
   },
   "dependencies": {
