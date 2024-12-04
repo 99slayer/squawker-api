@@ -7,7 +7,6 @@ import passport from 'passport';
 import { initialize } from './passportConfig';
 import { req, res, next } from './types';
 import http, { Server } from 'http';
-import https from 'https';
 import logger from 'morgan';
 import Debug from 'debug';
 import cors from 'cors';
@@ -15,6 +14,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import limit from 'express-rate-limit';
 const debug = Debug('server');
+import err from './handleError';
 
 import apiRouter from './routes/api';
 
@@ -47,11 +47,11 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
 	cors({
 		origin: [
-			'http://localhost:5173',
-			'http://127.0.0.1:5173'
+			`${process.env.ORIGIN_1}`
 		],
 		methods: ['GET', 'POST', 'PUT', 'DELETE'],
 		credentials: true,
+		preflightContinue: false
 	}),
 );
 app.use(express.static(path.join(__dirname, 'public')));
@@ -65,8 +65,8 @@ app.use(session({
 	store: MongoStore.create({ mongoUrl: db }),
 	cookie: {
 		httpOnly: true,
-		secure: true,
-		sameSite: 'none'
+		secure: false,
+		sameSite: false,
 	}
 }));
 app.use(passport.initialize());
@@ -78,7 +78,7 @@ app.use((req: req, res: res, next: next): res | next | void => {
 		req.url === '/signup' ||
 		req.url === '/signup-guest'
 	) return next();
-	if (!req.isAuthenticated()) throw new Error('401');
+	if (!req.isAuthenticated()) throw new Error('Unauthorized.');
 
 	const userData: Express.User = {
 		_id: req.user._id,
@@ -107,6 +107,8 @@ app.use((req: req, res: res, next: next): res | next | void => {
 	} else next();
 });
 
+app.use(err);
+
 app.use('/', apiRouter);
 
 // ---------------
@@ -114,13 +116,8 @@ type port = string | number | boolean;
 const port: port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 
-const server: Server = https.createServer(
-	{
-		key: process.env.KEY,
-		cert: process.env.CERT
-	},
-	app
-);
+const server: Server = http.createServer(app);
+
 server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
