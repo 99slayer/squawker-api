@@ -58,7 +58,7 @@ export const getUser: RequestHandler = asyncHandler(
 export const getUsers: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
 		const userCount: number = Number(req.query.userCount);
-		const batchSize: number = 10;
+		const batchSize: number = 20;
 
 		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('Invalid request query.');
 
@@ -123,7 +123,7 @@ export const getFollowers: RequestHandler = asyncHandler(
 export const getFollowing: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
 		const userCount: number = Number(req.query.userCount);
-		const batchSize: number = 4;
+		const batchSize: number = 20;
 
 		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('Invalid request query.');
 
@@ -163,6 +163,7 @@ export const follow: RequestHandler = asyncHandler(
 			.findOne({ username: req.params.username })
 			.orFail(new Error('Query failed.'));
 
+		if (user.user_type === 'Guest') throw new Error('Unacceptable request.');
 		if (user?.followers.includes(res.locals.user._id)) {
 			res.sendStatus(200);
 			return;
@@ -182,8 +183,10 @@ export const follow: RequestHandler = asyncHandler(
 export const unfollow: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next): Promise<void> => {
 		const user: doc<UserInterface> = await User
-			.findOne({ username: req.params.username });
+			.findOne({ username: req.params.username })
+			.orFail(new Error('Query failed.'));
 
+		if (user.user_type === 'Guest') throw new Error('Unacceptable request.');
 		if (!user?.followers.includes(res.locals.user._id)) {
 			res.sendStatus(200);
 			return;

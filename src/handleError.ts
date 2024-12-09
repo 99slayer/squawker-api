@@ -12,6 +12,8 @@ function handleError(
 	res: res,
 	next: next
 ) {
+	debug(err.message);
+
 	if (res.locals.validationErrors) {
 		debug('[VALIDATION ERRORS]');
 		debug(res.locals.validationErrors);

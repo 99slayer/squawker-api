@@ -19,6 +19,7 @@ import err from './handleError';
 import apiRouter from './routes/api';
 
 const app = express();
+app.enable('trust proxy');
 
 import mongoose from 'mongoose';
 mongoose.set('strictQuery', false);
@@ -37,7 +38,7 @@ app.use(helmet());
 
 const limiter = limit({
 	windowMs: 60000, // 1 min
-	max: 200
+	max: 400
 });
 app.use(limiter);
 
@@ -47,7 +48,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
 	cors({
 		origin: [
-			`${process.env.ORIGIN_1}`
+			`${process.env.ORIGIN_1}`,
+			`${process.env.ORIGIN_2}`,
 		],
 		methods: ['GET', 'POST', 'PUT', 'DELETE'],
 		credentials: true,
@@ -59,14 +61,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 initialize(passport);
 
 app.use(session({
-	secret: 'secret',
+	secret: process.env.SESSION_SECRET as string,
 	resave: false,
 	saveUninitialized: false,
 	store: MongoStore.create({ mongoUrl: db }),
 	cookie: {
-		httpOnly: true,
-		secure: false,
-		sameSite: false,
+		httpOnly: false,
+		secure: true,
+		sameSite: 'none'
 	}
 }));
 app.use(passport.initialize());
@@ -103,12 +105,11 @@ app.use((req: req, res: res, next: next): res | next | void => {
 		if (imageUrl.startsWith(process.env.SUPA_URL)) return next();
 		if (imageUrl === 'clear') return next();
 
-		throw new Error('404');
+		throw new Error('Invalid request query.');
 	} else next();
 });
 
 app.use(err);
-
 app.use('/', apiRouter);
 
 // ---------------

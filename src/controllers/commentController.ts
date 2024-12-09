@@ -47,7 +47,7 @@ export const getUserComments: RequestHandler = asyncHandler(
 export const getPostReplies: RequestHandler = asyncHandler(
 	async (req: req, res: res, next: next) => {
 		const commentCount: number = Number(req.query.commentCount);
-		const batchSize: number = 2;
+		const batchSize: number = 10;
 
 		if ((!commentCount && commentCount !== 0) || Number.isNaN(commentCount)) throw new Error('Invalid request query.');
 
