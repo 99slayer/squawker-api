@@ -3,12 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "DEBUG=server,error nodemon ./src/app.ts",
-    "dev-debug": "DEBUG=server nodemon --exec node -r ts-node/register --inspect ./src/app.ts",
+    "dev": "NODE_ENV=development DEBUG=server,error nodemon ./src/app.ts",
+    "dev-debug": "NODE_ENV=development DEBUG=server nodemon --exec node -r ts-node/register --inspect ./src/app.ts",
     "start": "node ./dist/app.js",
     "build": "tsc"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.7.5",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/debug": "^4.1.12",
+    "@types/express": "^4.17.21",
+    "@types/express-session": "^1.18.1",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.10.1",
+    "@types/passport-local": "^1.0.38",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
     "connect-mongo": "^5.1.0",
@@ -27,24 +37,14 @@
     "multer": "^1.4.5-lts.1",
     "nodemon": "^3.0.2",
     "passport": "^0.7.0",
-    "passport-local": "^1.0.0"
+    "passport-local": "^1.0.0",
+    "typescript": "^5.7.2"
   },
   "devDependencies": {
-    "@faker-js/faker": "^8.4.1",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/compression": "^1.7.5",
-    "@types/cookie-parser": "^1.4.7",
-    "@types/cors": "^2.8.17",
-    "@types/debug": "^4.1.12",
-    "@types/express": "^4.17.21",
-    "@types/express-session": "^1.18.0",
-    "@types/morgan": "^1.9.9",
-    "@types/node": "^20.14.9",
-    "@types/passport-local": "^1.0.38",
+    "@faker-js/faker": "^9.3.0",
     "@typescript-eslint/eslint-plugin": "^7.15.0",
     "@typescript-eslint/parser": "^7.15.0",
     "eslint": "^8.57.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.3"
+    "ts-node": "^10.9.2"
   }
 }

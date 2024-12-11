@@ -1,6 +1,5 @@
 /node_modules
 .env
 INFO.md
-/cert
 /dist
 /generate-data

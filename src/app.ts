@@ -18,6 +18,8 @@ import err from './handleError';
 
 import apiRouter from './routes/api';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const app = express();
 app.enable('trust proxy');
 
@@ -25,7 +27,7 @@ import mongoose from 'mongoose';
 mongoose.set('strictQuery', false);
 
 type db = string | undefined;
-const db: db = process.env.PROD_DB || process.env.TEST_DB;
+const db: db = isDev ? process.env.TEST_DB : process.env.PROD_DB;
 
 main().catch((err) => console.log(err));
 async function main(): Promise<void> {
@@ -48,8 +50,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
 	cors({
 		origin: [
-			`${process.env.ORIGIN_1}`,
-			`${process.env.ORIGIN_2}`,
+			`${isDev ? process.env.DEV_ORIGIN_1 : process.env.PROD_ORIGIN_1}`,
+			`${isDev ? process.env.DEV_ORIGIN_2 : process.env.PROD_ORIGIN_2}`,
 		],
 		methods: ['GET', 'POST', 'PUT', 'DELETE'],
 		credentials: true,
@@ -60,16 +62,24 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 initialize(passport);
 
+const prodCookie: object = {
+	httpOnly: false,
+	secure: true,
+	sameSite: 'none'
+};
+
+const devCookie: object = {
+	httpOnly: false,
+	secure: false,
+	sameSite: false
+};
+
 app.use(session({
 	secret: process.env.SESSION_SECRET as string,
 	resave: false,
 	saveUninitialized: false,
 	store: MongoStore.create({ mongoUrl: db }),
-	cookie: {
-		httpOnly: false,
-		secure: true,
-		sameSite: 'none'
-	}
+	cookie: isDev ? devCookie : prodCookie
 }));
 app.use(passport.initialize());
 app.use(passport.session());
