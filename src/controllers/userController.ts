@@ -63,7 +63,10 @@ export const getUsers: RequestHandler = asyncHandler(
 		if ((!userCount && userCount !== 0) || Number.isNaN(userCount)) throw new Error('Invalid request query.');
 
 		const users: doc<UserInterface>[] = await User
-			.find({ username: { $ne: res.locals.user.username } })
+			.find({
+				username: { $ne: res.locals.user.username },
+				user_type: { $ne: 'Guest' }
+			})
 			.skip(userCount)
 			.limit(batchSize)
 			.select('-password -email')
