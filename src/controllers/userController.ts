@@ -330,8 +330,8 @@ export const createGuestUser: RequestHandler = asyncHandler(
 
 			const users = await User
 				.aggregate([
-					{ $sample: { size: 10 } },
 					{ $match: { user_type: { $ne: 'Guest' } } },
+					{ $sample: { size: 10 } },
 				]);
 
 			user.following = users;
