@@ -1,6 +1,5 @@
 # Squawker-api
-![logo](./public/squawker-logo.png)
-
+![logo](./public/squawker-logo.png)\
 Squawker is my final project for The Odin Project. It aims to replicate the core functionality of Twitter.
 
 Checkout the live preview! 👉 **[Squawker Live Demo](https://99slayer.github.io/squawker-client)**\
