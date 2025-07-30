@@ -4,6 +4,8 @@ import passport, { DoneCallback as dcb } from 'passport';
 import bcrypt from 'bcryptjs';
 import { PopulatedDoc } from 'mongoose';
 import { UserInterface } from './types';
+import Debug from 'debug';
+const debug = Debug('debug');
 
 export function initialize(passport: passport.PassportStatic) {
 	const authenticateUser = async (
@@ -14,15 +16,21 @@ export function initialize(passport: passport.PassportStatic) {
 		const user: UserInterface | null = await User.findOne({ username: username });
 
 		if (!user) {
+			debug('User Not found.');
 			const err = new Error('Query failed.');
 			return done(err, false);
 		}
 
 		try {
-			if (!('password' in user)) return done(null, false);
+			if (!('password' in user)) {
+				debug('Password not found.');
+				return done(null, false);
+			}
 			if (await bcrypt.compare(password, user.password)) {
+				debug('Password verified.');
 				return done(null, user);
 			} else {
+				debug('Invalid password.');
 				const err = new Error('Invalid user input.');
 				return done(err, false);
 			}
@@ -36,6 +44,7 @@ export function initialize(passport: passport.PassportStatic) {
 	);
 
 	passport.serializeUser((user: any, done: dcb): void => {
+		debug('User serialized.');
 		done(null, user._id);
 	});
 
