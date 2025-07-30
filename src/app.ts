@@ -52,6 +52,7 @@ app.use(
 		origin: [
 			`${isDev ? process.env.DEV_ORIGIN_1 : process.env.PROD_ORIGIN_1}`,
 			`${isDev ? process.env.DEV_ORIGIN_2 : process.env.PROD_ORIGIN_2}`,
+			`${isDev ? process.env.DEV_ORIGIN_3 : ''}`
 		],
 		methods: ['GET', 'POST', 'PUT', 'DELETE'],
 		credentials: true,
@@ -81,6 +82,7 @@ app.use(session({
 	store: MongoStore.create({ mongoUrl: db }),
 	cookie: isDev ? devCookie : prodCookie
 }));
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -104,19 +106,6 @@ app.use((req: req, res: res, next: next): res | next | void => {
 
 	res.locals.user = userData;
 	next();
-});
-
-// Validates image urls.
-app.use((req: req, res: res, next: next): res | next | void => {
-	if (req.body.image || req.body.pfp || req.body.header) {
-		const imageUrl: string = req.body.image || req.body.pfp || req.body.header;
-
-		if (!process.env.SUPA_URL) throw new Error('500');
-		if (imageUrl.startsWith(process.env.SUPA_URL)) return next();
-		if (imageUrl === 'clear') return next();
-
-		throw new Error('Invalid request query.');
-	} else next();
 });
 
 app.use(err);

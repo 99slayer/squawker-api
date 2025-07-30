@@ -112,7 +112,7 @@ export const createComment: (RequestHandler | ValidationChain)[] = [
 		.if((value, { req }) => {
 			return req.body.image;
 		})
-		.isURL(),
+		.isString(),
 
 	asyncHandler(
 		async (req: req, res: res, next: next) => {

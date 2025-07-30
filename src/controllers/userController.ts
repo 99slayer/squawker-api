@@ -435,7 +435,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			.if((value, { req }) => {
 				return req.body.header;
 			})
-			.isURL(),
+			.isString(),
 		body('header')
 			.if((value, { req }) => {
 				return req.body.header;
@@ -451,7 +451,7 @@ export const updateUserAccount: (RequestHandler | ValidationChain)[] = [
 			.if((value, { req }) => {
 				return req.body.pfp;
 			})
-			.isURL(),
+			.isString(),
 		body('pfp')
 			.if((value, { req }) => {
 				return req.body.pfp;
