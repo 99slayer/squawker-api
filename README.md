@@ -34,18 +34,18 @@ Start the development server with `npm run dev`
 #### Usage
 Create these environment variables in a `.env` file.
 ```
-SESSION_SECRET=<session_secret>
-SUPA_URL=<supabase_database_endpoint>
+SESSION_SECRET=<session secret>
+SUPA_URL=<supabase database endpoint>
 
-// These environment variables are for development.
-TEST_DB=<mongo_development_database_connection_string>
-DEV_ORIGIN_1=<development_frontend_url_1>
-DEV_ORIGIN_2=<development_frontend_url_2>
+// Development variables.
+TEST_DB=<mongo development database connection string>
+DEV_ORIGIN_1=<development frontend url 1>
+DEV_ORIGIN_2=<development frontend url 2>
 
-// These environment variables are for production.
-PROD_DB=<mongo_production_database_connection_string>
-PROD_ORIGIN_1=<production_frontend_url_1>
-PROD_ORIGIN_2=<production_frontend_url_2>
+// Production variables.
+PROD_DB=<mongo production database connection string>
+PROD_ORIGIN_1=<production frontend url 1>
+PROD_ORIGIN_2=<production frontend url 2>
 ```
 This project uses a free [MongoDB](https://www.mongodb.com/) database to store/manage data.
 
